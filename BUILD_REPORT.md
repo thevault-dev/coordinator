@@ -4,7 +4,7 @@
 DONE — both tables are live in a new Supabase project, every Definition of Done check passes, and the security advisor reports no findings.
 
 ## Where it lives
-- Repo: `thevault-dev/coordinator`, branch `claude/coordinator-ledger-ubez2p`. The ledger commit is `738f884`, and this report is committed on top of it. The repo was empty, so there is no `main` branch yet and no PR has been opened.
+- Repo: `thevault-dev/coordinator`, branch `main` (the repo's default). The ledger commit is `738f884`, and this report is committed on top of it. The build was done on `claude/coordinator-ledger-ubez2p`, which became `main` and was then deleted.
 - Supabase project: `coordinator` (ref `hgkreprqxevayruqpibf`, eu-central-1, thevault-dev org, Free plan)
 - Migration files:
   - `supabase/migrations/20260926092126_create_ledger.sql`, which creates the `requests` and `rules` tables
@@ -63,13 +63,13 @@ DONE — both tables are live in a new Supabase project, every Definition of Don
 - **"This week" in the view** means Monday 00:00 to Sunday 24:00, Abu Dhabi time.
 - **`duration_min` is capped at 1440** (one day).
 - **The tables live in the `public` schema** of the new project, which is the simplest option for the Supabase client libraries.
+- **`main` is the default branch.** Khaled made it the default after the build, and the build branch was then deleted. Future builds should branch from `main`.
 
 ## Open questions / risks
 - **The service key is shared.** All three agents use the same service key, so the database can't stop a domain agent from writing the Coordinator's half, or the reverse. The split is by convention, as documented in the README. If that matters later, give each agent its own database role, with column-level grants.
 - **Re-posting a request that is already scheduled.** The upsert updates the top half but leaves `status`/`slot_*` untouched. The Coordinator needs to spot these changes, for example by comparing `updated_at` to when it last decided, and decide whether to re-plan. Domain agents must upsert only top-half fields.
 - **Free-plan pausing.** Supabase pauses Free-plan projects after about a week without activity. Until the agents are running daily, the project may pause and need restoring from the dashboard. Upgrading avoids this but costs money, so it is Khaled's call.
 - **Agents need the secret key.** They need the service-role (secret) key from Supabase Dashboard → Project Settings → API keys. It was not generated or stored anywhere by this build. Keep it out of any client-side app.
-- **No path onto `main`.** The branch hasn't been merged, and the repo has no `main` branch yet. Merge it or open a PR so future builds start from it.
 - **`done` isn't set by anyone.** Nothing marks a request `done` automatically. The Coordinator (or a nightly job) should do it after `slot_end` passes.
 
 ## Suggested next build
