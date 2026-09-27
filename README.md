@@ -116,12 +116,80 @@ Row-level security is switched on for both tables, and the public ("anon") and l
 
 ---
 
+## The Coordinator (v1)
+
+The Coordinator is a Claude skill (`.claude/skills/coordinator/SKILL.md`) that runs every morning as a scheduled Claude session.
+
+### What happens each morning
+1. **Housekeeping.** Anything scheduled whose time has passed is marked `done`. Anything a domain agent re-posted after it was proposed or booked is **flagged** in the digest. It is never moved silently.
+2. **Reading.** It reads the new requests, the active `rules`, and busy time on three calendars:
+   - your personal calendar
+   - PRNTCODE, which it sees as busy blocks only, with no titles
+   - the Coordinator calendar
+3. **Placing.** It proposes a slot for each request:
+   - It respects each request's window, `fixed`/`flexible`/`anytime` setting and priority. 1 wins over 2.
+   - Mon–Thu 09:00–18:00 is never used (fund hours).
+   - Fridays allow up to about 2 hours away in total.
+   - It avoids 22:00–07:00.
+   - It never proposes anything starting within 2 hours of the run.
+   - If nothing fits before the due date, the request is **bumped**, with the reason.
+4. **Digest.** You get one short message on your phone:
+   ```
+   Coordinator · Sun 27 Sep
+
+   1. PRNTCODE: supplier call review — Tue 19:00–20:00 (due Wed)
+   2. Personal: dentist — Sat 3 Oct 11:00–12:00 (fixed)
+
+   Bumped: Personal: board prep — no 3h slot before Mon 18:00 (fund hours)
+
+   Reply: approve 1 2 · approve all · approve none
+   ```
+
+### How to approve
+Reply **in that same session**:
+
+| You type | What happens |
+|---|---|
+| `approve 1 3` | 1 and 3 go on the **Coordinator** calendar. Everything else in that digest is declined. |
+| `approve all` | Everything in the digest goes on the calendar. |
+| `approve none` | Everything is declined. Nothing touches any calendar. |
+| `approve 1; 2 too late` | Books 1 and declines 2, saving "too late" as the reason for the source agent. |
+| `keep 4` | Keeps a flagged "changed since booked" item as it is. |
+
+Approved blocks appear on the **Coordinator** calendar, titled `[Personal] …` or `[PRNTCODE] …`. The Coordinator never writes to any other calendar, and never touches events you created yourself. Nothing is written anywhere without your reply.
+
+### The daily schedule
+The morning run is a **Routine in the claude.ai app** (Code → Routines). It has to be created there, because only Routines made in the app can carry the Google Calendar and Supabase connectors. Its settings:
+- **Repository:** `thevault-dev/coordinator`
+- **Connectors:** Google Calendar, Supabase
+- **Schedule:** daily at 06:48 Abu Dhabi time
+- **Notifications:** push on, so the digest reaches your phone
+- **Prompt:** `Run the coordinator skill (.claude/skills/coordinator/SKILL.md): do the daily run and send me the digest. Then wait for my approval reply.`
+
+### How the writes are kept exact
+The Coordinator never edits the `requests` table directly. It calls checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
+- a slot of the wrong length
+- a slot outside the request's window
+- a fixed item not at its fixed time
+- a slot in the past
+- an overlap with something already proposed or booked
+- approving a slot that has changed since the digest
+
+Every run is logged in `coordinator_runs`, including the digest numbering, so `approve 2` always means exactly the item shown as 2.
+
+### Changing the rules
+Standing rules live in the `rules` table, in plain English. `hard` rules are never broken; `soft` rules can be broken, but only with a reason in the decision note. To change one, add a migration, or ask Claude to add, edit or deactivate a rule.
+
+---
+
 ## Where things are in this repo
 
 | Path | What it is |
 |---|---|
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
+| `.claude/skills/coordinator/SKILL.md` | The Coordinator itself: the daily run, the digest format and approval handling. |
+| `coordinator/PROBE.md` | A one-off calendar-access check. Run it if calendar access ever seems broken. |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later
