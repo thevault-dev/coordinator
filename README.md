@@ -187,8 +187,31 @@ In a regular Chat, just type "run the coordinator"; Chat loads plugin commands a
 ### Changing the Coordinator
 Edit the files under `plugins/coordinator/`, **raise `version`** in `plugins/coordinator/.claude-plugin/plugin.json`, and push to `main`. With Sync automatically on, claude.ai picks up the new version.
 
+### Adding your own requests from chat (intake)
+Until the Personal and PRNTCODE agents are connected, you feed the Coordinator yourself, in any regular Claude chat. Just type:
+
+| You type | What happens |
+|---|---|
+| `I need 2 hours for GMAT prep this week` | You get one line to confirm: `Personal · GMAT prep · 2h · by Sun 4 Oct · flexible · P3 — add it?`. Reply `yes`, or correct it ("make it P1") and it shows the line again. |
+| `Block time for a supplier call, 1h, by Wed, urgent` | Same, filed under PRNTCODE, at P1. |
+| `Dentist Sat 11am, 1 hour` | Added as **fixed** at that time. |
+| `gym Tue 1h, GMAT 2h, call Sophie 30m` | Several items at once, with one confirmation. |
+| `What's on my list?` | Open items, grouped: waiting to be placed, proposed, scheduled this week. |
+| `Drop the GMAT block` | Withdraws it after you confirm. If it was already on your calendar, the Coordinator calendar event is removed too. |
+| `Place it now` (after adding) | Runs the Coordinator immediately instead of waiting for 07:00. |
+
+**Defaults, if you don't say:**
+- due in 7 days
+- `flexible`
+- priority 3, where 1 is the most important
+- personal or PRNTCODE decided from what the item is about
+
+It always asks how long the item takes if you don't say. It asks personal or PRNTCODE only when that's unclear. If you already have something similar open, it asks "same thing or new?" first. Nothing is written until you say yes.
+
+Intake only *records* what you need. The Coordinator decides where it goes, at 07:00 or when you say "place it now". Chat-added items carry `sub_agent = 'khaled'` and a `chat-…` reference.
+
 ### How the writes are kept exact
-The Coordinator never edits the `requests` table directly. It calls checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
+Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request` and `intake_withdraw`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
 - a slot of the wrong length
 - a slot outside the request's window
 - a fixed item not at its fixed time
@@ -210,7 +233,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, listing and withdrawing requests from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later

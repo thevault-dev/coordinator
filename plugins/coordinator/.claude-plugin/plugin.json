@@ -1,8 +1,8 @@
 {
   "name": "coordinator",
   "displayName": "Coordinator",
-  "version": "1.0.0",
-  "description": "Owns Khaled's calendar. Reads time requests from the Supabase ledger, proposes slots against his rules and three calendars, sends a short numbered digest, and books only what he approves on the Coordinator calendar. Needs the Google Calendar and Supabase connectors.",
+  "version": "1.1.0",
+  "description": "Owns Khaled's calendar. Reads time requests from the Supabase ledger, proposes slots against his rules and three calendars, sends a short numbered digest, and books only what he approves on the Coordinator calendar. Khaled can add, list and withdraw requests from chat (intake). Needs the Google Calendar and Supabase connectors.",
   "author": { "name": "Khaled" },
   "license": "UNLICENSED"
 }

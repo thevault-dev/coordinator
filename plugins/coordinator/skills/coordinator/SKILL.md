@@ -1,6 +1,6 @@
 ---
 name: coordinator
-description: Khaled's Coordinator, which owns his calendar. Use it for the daily placement run (the 07:00 scheduled task, "run the coordinator", "daily run", "what needs scheduling") and for approval replies to a Coordinator digest ("approve 1 3", "approve all", "approve none", "keep 4"). It reads new time requests from the Supabase ledger, proposes slots, sends a short numbered digest, and writes approved blocks to the "Coordinator" Google calendar only.
+description: Khaled's Coordinator, which owns his calendar. Use it for the daily placement run (the 07:00 scheduled task, "run the coordinator", "daily run", "place it now") and for approval replies to a Coordinator digest ("approve 1 3", "approve all", "approve none", "keep 4"). It reads new time requests from the Supabase ledger, proposes slots, sends a short numbered digest, and writes approved blocks to the "Coordinator" Google calendar only. Adding, listing or withdrawing requests from chat is the intake skill, not this one.
 ---
 
 # Coordinator
