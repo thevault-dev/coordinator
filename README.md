@@ -118,7 +118,9 @@ Row-level security is switched on for both tables, and the public ("anon") and l
 
 ## The Coordinator (v1)
 
-The Coordinator is a Claude skill (`.claude/skills/coordinator/SKILL.md`) that runs every morning as a scheduled Claude session.
+The Coordinator is a **Claude plugin** that lives in this repo (`plugins/coordinator/`). You install it once in claude.ai, and it runs every morning at 07:00 as a **Cowork scheduled task**. You can also run it any time in a regular Chat by typing "run the coordinator".
+
+The repo is also a plugin marketplace (`.claude-plugin/marketplace.json`), so claude.ai installs the plugin straight from GitHub and keeps it in sync.
 
 ### What happens each morning
 1. **Housekeeping.** Anything scheduled whose time has passed is marked `done`. Anything a domain agent re-posted after it was proposed or booked is **flagged** in the digest. It is never moved silently.
@@ -142,11 +144,11 @@ The Coordinator is a Claude skill (`.claude/skills/coordinator/SKILL.md`) that r
 
    Bumped: Personal: board prep — no 3h slot before Mon 18:00 (fund hours)
 
-   Reply: approve 1 2 · approve all · approve none
+   Reply: approve 1 2 · approve all · approve none   (ref 23c40c74)
    ```
 
 ### How to approve
-Reply **in that same session**:
+Reply **in the same Cowork task or Chat** where the digest arrived:
 
 | You type | What happens |
 |---|---|
@@ -158,13 +160,32 @@ Reply **in that same session**:
 
 Approved blocks appear on the **Coordinator** calendar, titled `[Personal] …` or `[PRNTCODE] …`. The Coordinator never writes to any other calendar, and never touches events you created yourself. Nothing is written anywhere without your reply.
 
-### The daily schedule
-The morning run is a **Routine in the claude.ai app** (Code → Routines). It has to be created there, because only Routines made in the app can carry the Google Calendar and Supabase connectors. Its settings:
-- **Repository:** `thevault-dev/coordinator`
-- **Connectors:** Google Calendar, Supabase
-- **Schedule:** daily at 06:48 Abu Dhabi time
-- **Notifications:** push on, so the digest reaches your phone
-- **Prompt:** `Run the coordinator skill (.claude/skills/coordinator/SKILL.md): do the daily run and send me the digest. Then wait for my approval reply.`
+### One-time setup (in the Claude app)
+1. **Install the plugin.**
+   1. Go to **Customize → Plugins → Add → Add marketplace**.
+   2. Enter `thevault-dev/coordinator`. If asked, connect GitHub and give the Claude GitHub App access to this repo.
+   3. Install **coordinator**.
+   4. Turn on **Sync automatically**, so every change pushed to `main` reaches you.
+2. **Connectors.** Google Calendar and Supabase must both show as connected under **Customize → Connectors**.
+
+   The Google Calendar connector needs these tools allowed: `list_calendars`, `list_events`, `get_event`, `create_event` and `delete_event`.
+3. **Create the daily task.** In **Cowork → Scheduled**, create a new task:
+   - **Schedule:** daily at 07:00 Abu Dhabi time
+   - **Prompt:** `/coordinator:daily-run`
+
+   Scheduled tasks run in the cloud, so your computer can be off. You get a phone alert when the digest is ready.
+
+### Commands
+| Command | What it does |
+|---|---|
+| `/coordinator:daily-run` | The daily run: housekeeping, placement and the digest. The 07:00 task uses this. |
+| `/coordinator:approve approve 1 3` | Applies a reply. Plain `approve 1 3` under a digest works too. |
+| `/coordinator:check-access` | Diagnoses calendar and ledger access if something seems broken. |
+
+In a regular Chat, just type "run the coordinator"; Chat loads plugin commands as skills.
+
+### Changing the Coordinator
+Edit the files under `plugins/coordinator/`, **raise `version`** in `plugins/coordinator/.claude-plugin/plugin.json`, and push to `main`. With Sync automatically on, claude.ai picks up the new version.
 
 ### How the writes are kept exact
 The Coordinator never edits the `requests` table directly. It calls checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
@@ -175,7 +196,7 @@ The Coordinator never edits the `requests` table directly. It calls checked data
 - an overlap with something already proposed or booked
 - approving a slot that has changed since the digest
 
-Every run is logged in `coordinator_runs`, including the digest numbering, so `approve 2` always means exactly the item shown as 2.
+Every run is logged in `coordinator_runs`, including the digest numbering. Each digest ends with a short `ref`, so `approve 2` always means exactly the item shown as 2 in *that* digest.
 
 ### Changing the rules
 Standing rules live in the `rules` table, in plain English. `hard` rules are never broken; `soft` rules can be broken, but only with a reason in the decision note. To change one, add a migration, or ask Claude to add, edit or deactivate a rule.
@@ -188,8 +209,8 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 |---|---|
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
-| `.claude/skills/coordinator/SKILL.md` | The Coordinator itself: the daily run, the digest format and approval handling. |
-| `coordinator/PROBE.md` | A one-off calendar-access check. Run it if calendar access ever seems broken. |
+| `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later

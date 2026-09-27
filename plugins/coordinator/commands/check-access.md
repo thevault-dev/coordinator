@@ -1,15 +1,19 @@
-# Coordinator access probe (one-off)
+---
+description: Diagnose the Coordinator's calendar and ledger access (read all three calendars, write-and-delete a test event on the Coordinator calendar)
+---
 
-You are running a one-off ACCESS PROBE for Khaled's Coordinator agent. It checks that a scheduled session can read his three calendars and write to the "Coordinator" calendar.
+# Coordinator access check
 
-Don't build anything, edit files or push to git. Your only output is one row in the Supabase table `coordinator_runs`, plus a short summary at the end. Record errors word for word.
+Run this when the Coordinator seems unable to read or write a calendar. It checks that this conversation or task can read Khaled's three calendars and write to the "Coordinator" calendar.
+
+Don't change anything else. Your only output is one row in the Supabase table `coordinator_runs`, plus a short summary at the end. Record errors word for word.
 
 ## Hard safety rules
 - The **only** calendar you may write to is the one named exactly **Coordinator**. Never create, edit or delete events on any other calendar.
 - If `create_event` can't target a specific calendar ID, don't call it at all. Record that fact instead.
 
 ## Steps
-1. **Load the tools.** Use ToolSearch with `+Google_Calendar`, then again with `google calendar list create event freebusy`, to load every Google Calendar connector tool. Load the Supabase `execute_sql` tool with `+Supabase execute_sql`. Record each Google Calendar tool's name and parameter names. If a Supabase or Google Calendar tool is missing, say so clearly in your final summary, write what you can, and stop.
+1. **Load the tools.** Load every Google Calendar connector tool and the Supabase `execute_sql` tool, using tool search if they aren't loaded yet. Record each Google Calendar tool's name and parameter names. If a Supabase or Google Calendar tool is missing, say so clearly in your final summary, write what you can, and stop.
 2. **List the calendars.** Call `list_calendars`. For every calendar, record its `id`, `summary`, `accessRole` and `primary` flag.
 3. **Identify three calendars:**
    - (a) the primary personal calendar

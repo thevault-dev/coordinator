@@ -1,0 +1,14 @@
+{
+  "name": "thevault-coordinator",
+  "description": "Khaled's Coordinator agent: daily calendar placement from the shared Supabase ledger, with approval by number.",
+  "owner": {
+    "name": "Khaled"
+  },
+  "plugins": [
+    {
+      "name": "coordinator",
+      "source": "./plugins/coordinator",
+      "description": "Daily 07:00 digest of proposed time blocks from the ledger; approve by number and approved blocks go on the Coordinator calendar."
+    }
+  ]
+}
