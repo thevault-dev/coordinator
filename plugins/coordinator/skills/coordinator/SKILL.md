@@ -110,8 +110,8 @@ Coordinator · Sun 27 Sep
 Bumped: Personal: board prep — no 3h slot before Mon 18:00 (fund hours)
 Changed since booked: 4. PRNTCODE: shoot — now 90 min (booked Thu 19:00)
 
-Reply: approve 1 2 · approve all · approve none   (ref 23c40c74)
-Decline with a reason: "approve 1; 2 too late". "keep 4" keeps a changed item.
+Reply: approve 1 2 · approve all · no 2 (+ reason)   (ref 23c40c74)
+Anything you don't mention stays proposed. "keep 4" keeps a changed item.
 ```
 - End the reply line with `(ref <first 8 characters of this run's id>)`. The ref ties Khaled's reply to exactly this digest.
 - The line format is `<n>. <Personal|PRNTCODE>: <title in lower case> — <Day HH:MM–HH:MM> (<due Day | fixed | anytime>)`.
@@ -123,7 +123,7 @@ Decline with a reason: "approve 1; 2 too late". "keep 4" keeps a changed item.
 
 ## B. Approval reply (in the same conversation or task, after a digest)
 
-Khaled replies with `approve 1 3`, `approve all` or `approve none`. He may add a reason for declined items, such as `approve 1; 2 clashes with dinner`, and may reply `keep 4` for flagged items.
+Khaled replies with, for example, `approve 1 3`, `approve all`, `no 2`, `approve 1; 2 clashes with dinner`, `approve none` or `keep 4`.
 
 1. **Find the digest mapping.** Take the `ref` from the digest Khaled is replying to (the one above his reply in this conversation), and read that run:
    ```sql
@@ -131,9 +131,9 @@ Khaled replies with `approve 1 3`, `approve all` or `approve none`. He may add a
    ```
    Use `detail->'items'`. **The numbers mean exactly what that row says.** If there is no ref or no matching row, ask Khaled before writing anything. Never fall back to a different digest.
 2. **Understand the reply.**
-   - Approved numbers are what he listed, or every item for `approve all`.
-   - Every other numbered item in that digest is **declined**, with his reason if he gave one.
-   - `approve none` declines them all.
+   - **Approved:** the numbers he listed after "approve", or every item for `approve all`.
+   - **Declined:** only the numbers he **explicitly** rejects, e.g. `no 2`, `decline 2`, `drop 2`, or a number followed by a reason such as `2 too late`. Include his reason if he gave one. `approve none` (or `none`) declines every item in the digest.
+   - **Everything else stays `proposed`, untouched. Never decline an item he didn't mention.** It keeps its slot, and the next daily run re-checks and re-lists it.
    - If the reply is ambiguous, e.g. a number that isn't in the digest, ask him **before** writing anything.
 3. Start a log row: `kind = 'approval'`.
 4. **For each approved item:**
@@ -151,7 +151,7 @@ Khaled replies with `approve 1 3`, `approve all` or `approve none`. He may add a
 5. **For each declined item:** call `coordinator_decline(id, reason)`.
 6. **For each `keep N`:** call `coordinator_acknowledge(id)`.
 7. Finish the log row with the counts and each `calendar_event_id`.
-8. **Reply in two lines or fewer**, e.g. `Booked 1 (Tue 19:00). Declined 2.`
+8. **Reply in two lines or fewer**, e.g. `Booked 1 (Tue 19:00). Declined 2. 3 still open — it'll be in tomorrow's digest.`
 
 ## Nice-to-have: Monday shape of the week
 On Mondays, add one line under the date: `This week: 3 PRNTCODE blocks, 4 personal, 2 evenings free`. Count from `scheduled` plus `proposed` requests and the calendars' free evenings (19:00–22:00 with no busy time). Skip this line if the count is unreliable.

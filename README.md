@@ -144,7 +144,7 @@ The repo is also a plugin marketplace (`.claude-plugin/marketplace.json`), so cl
 
    Bumped: Personal: board prep — no 3h slot before Mon 18:00 (fund hours)
 
-   Reply: approve 1 2 · approve all · approve none   (ref 23c40c74)
+   Reply: approve 1 2 · approve all · no 2 (+ reason)   (ref 23c40c74)
    ```
 
 ### How to approve
@@ -152,10 +152,10 @@ Reply **in the same Cowork task or Chat** where the digest arrived:
 
 | You type | What happens |
 |---|---|
-| `approve 1 3` | 1 and 3 go on the **Coordinator** calendar. Everything else in that digest is declined. |
+| `approve 1 3` | 1 and 3 go on the **Coordinator** calendar. Anything you don't mention **stays proposed** and shows up again in tomorrow's digest. |
 | `approve all` | Everything in the digest goes on the calendar. |
-| `approve none` | Everything is declined. Nothing touches any calendar. |
-| `approve 1; 2 too late` | Books 1 and declines 2, saving "too late" as the reason for the source agent. |
+| `no 2` · `2 too late` | Declines just item 2, saving your reason for the source agent. You can combine this with an approval: `approve 1; 2 too late`. |
+| `approve none` | Declines everything in the digest. Nothing touches any calendar. |
 | `keep 4` | Keeps a flagged "changed since booked" item as it is. |
 
 Approved blocks appear on the **Coordinator** calendar, titled `[Personal] …` or `[PRNTCODE] …`. The Coordinator never writes to any other calendar, and never touches events you created yourself. Nothing is written anywhere without your reply.

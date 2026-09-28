@@ -40,5 +40,11 @@ PARTIAL. Everything is built, live and correct at the database level. Two Defini
 - **GMAT prep (2h, due Sun 4 Oct) is still open.** Keep it, or was it a test?
 - **The 07:00 scheduled task didn't fire today.** Check its status and expiry in Cowork.
 
+## Follow-up (v1.2.1, same day)
+- **Approval rule changed:** only items Khaled explicitly rejects ("no 2", "2 too late", "approve none") are declined. Unmentioned items stay proposed and reappear in the next digest.
+- **Drives restored:** both Dubai drives (this week's and W41) are back to waiting.
+- **07:00 run:** the scheduled task had not been created yet. Khaled is setting it up.
+- **Reminders:** Apple Reminders has no claude.ai connector, so reminders can't reach it from phone chat. Calendar-alert reminders are the workable route.
+
 ## Suggested next build
 Approval semantics (unlisted items stay proposed), plus reminders from chat. Reminders are sketched in the chat reply.
