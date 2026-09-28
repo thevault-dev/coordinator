@@ -199,6 +199,13 @@ Until the Personal and PRNTCODE agents are connected, you feed the Coordinator y
 | `What's on my list?` | Open items, grouped: waiting to be placed, proposed, scheduled this week. |
 | `Drop the GMAT block` | Withdraws it after you confirm. If it was already on your calendar, the Coordinator calendar event is removed too. |
 | `Place it now` (after adding) | Runs the Coordinator immediately instead of waiting for 07:00. |
+| `Make GMAT 3h` · `move it to P1` · `due Friday instead` | Edits an item that's waiting or proposed, after a one-line confirmation. A proposed item goes back to waiting and is placed again. A booked item can't be edited; you drop it and re-add it. |
+| `Every week I drive back to Dubai Thursday after work or Friday, 1.5h, P1` | Sets up a **weekly** item after confirmation. Each week's copy appears in the digest marked `(weekly)`. |
+| `Skip the Dubai drive this week` | Drops only this week's copy. The weekly item stays on. |
+| `Stop the Dubai drive` | Turns the weekly item off. |
+| `What repeats?` | Lists your weekly items. |
+
+**You never have to mention the Coordinator.** Any ask for time, such as "I need time to…", "find time for…", "put X in my calendar" or "block…", goes to intake. **Nothing goes straight onto your calendar:** events only appear after you approve a digest. If something can't wait until 07:00, say "place it now".
 
 **Defaults, if you don't say:**
 - due in 7 days
@@ -210,8 +217,13 @@ It always asks how long the item takes if you don't say. It asks personal or PRN
 
 Intake only *records* what you need. The Coordinator decides where it goes, at 07:00 or when you say "place it now". Chat-added items carry `sub_agent = 'khaled'` and a `chat-…` reference.
 
+### Weekly items
+Weekly templates live in the `recurring` table: title, length, a weekly window such as Thu 18:00 → Fri 23:59, flexibility, priority, and on/off.
+
+Every daily run posts **this week's and next week's** copy of each active template, as ordinary requests with `source_ref = recur-<template id>-<year>-W<week>`. That reference can only exist once per week, so a copy is never posted twice. A skipped week also keeps its reference, so a skip is never undone by the next run.
+
 ### How the writes are kept exact
-Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request` and `intake_withdraw`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
+Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request`, `intake_update`, `intake_withdraw`, `intake_add_recurring`, `intake_skip_recurring_week` and `intake_stop_recurring`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
 - a slot of the wrong length
 - a slot outside the request's window
 - a fixed item not at its fixed time
@@ -233,7 +245,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, listing and withdrawing requests from chat) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later

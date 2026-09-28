@@ -1,11 +1,13 @@
 ---
 name: intake
-description: Khaled adds, lists or withdraws his own time requests for the Coordinator from chat. Use it when he says "add to my coordinator", "I need 2 hours for X", "block time for…", "schedule…", "find time for…", asks "what's on my list?" or "what's pending?", or says "drop / cancel / remove the X block". It only records requests. Placing them is the coordinator skill's job.
+description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger. Never create calendar events directly for these; the Coordinator books time only after Khaled approves.
 ---
 
 # Intake
 
 Khaled tells you what time he needs, and you record it in the Coordinator's ledger. The Coordinator places it at its next 07:00 run.
+
+**Golden rule:** a time request **never** becomes a calendar event directly, not even "just this once" and not even if Khaled says "put it in my calendar". It always goes into the ledger through this skill. Events only ever come from the Coordinator, after Khaled approves its digest. If he needs it placed right away, offer **"place it now"**, which runs the Coordinator immediately.
 
 **You only write the top half of a request:** what, how long, by when, how movable, how important.
 - **Never** propose slots or times.
@@ -16,11 +18,13 @@ Khaled is usually on his phone. Keep every reply to one or two lines, with no ch
 
 ## Tools and fixed facts
 - **Supabase connector:** `execute_sql` on project `hgkreprqxevayruqpibf`. Send **one SQL statement per call**.
-- **Google Calendar connector:** used only for withdrawing a scheduled item.
+- **Google Calendar connector:** used only to delete the event of a scheduled item Khaled withdraws or skips.
   - The Coordinator calendar is the one whose summary, trimmed, is `Coordinator`: `4f0f7f079667e9b74eb5605d03065375d94f32de53fa7548afbb4d354b0f50da@group.calendar.google.com`.
   - If `list_calendars` doesn't show that ID under that name, stop and say so.
 - **Timezone:** Khaled is in Abu Dhabi (`Asia/Dubai`, UTC+4). Store UTC, and show Abu Dhabi time.
-- **Never insert or update `requests` directly.** Use `intake_add_request` and `intake_withdraw`.
+- **Never insert or update `requests` or `recurring` directly.** Use only the checked functions:
+  - `intake_add_request`, `intake_update`, `intake_withdraw`
+  - `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`
 
 If a tool isn't loaded, find it with tool search. If a connector isn't connected, tell Khaled which one to connect.
 
@@ -46,10 +50,12 @@ Read the open items:
 ```sql
 select id, title, status, source_agent from public.requests where status in ('new','proposed','scheduled') order by created_at;
 ```
+Also check active weekly templates: `select id, title from public.recurring where active;`. A one-off that matches a weekly item probably belongs to that template, so ask.
+
 If one is clearly the same thing, ask **before** the confirmation line. Examples: the same activity ("GMAT prep" vs "GMAT study"), or a title contained in the other.
 
 `You already have GMAT prep (2h, waiting to be placed). Same thing or new?`
-- **"same"**: add nothing. If he wants the existing one changed, say that editing isn't supported yet and offer to withdraw it and add a new one.
+- **"same"**: add nothing. If what he said differs from the existing item (a new length, deadline or priority), offer to **edit** it instead (section 5).
 - **"new"**: carry on.
 
 ### Confirm with one line, then write only after "yes"
@@ -89,7 +95,7 @@ Add all 3?
 ## 2. "What's on my list?"
 Read the open items:
 ```sql
-select title, source_agent, status, duration_min, due_by, slot_start, slot_end from public.requests where status in ('new','proposed','scheduled') order by status, coalesce(slot_start, due_by);
+select title, source_ref, source_agent, status, duration_min, due_by, slot_start, slot_end from public.requests where status in ('new','proposed','scheduled') order by status, coalesce(slot_start, due_by);
 ```
 Group them by status, in Abu Dhabi time. Show `scheduled` only for this week (Mon–Sun, Abu Dhabi time); add `+N later` if there are more. Fit it on one phone screen:
 ```
@@ -103,7 +109,7 @@ Proposed (1) — reply to the digest to approve
 Scheduled this week (1)
 · Gym · Tue 19:00–20:00
 ```
-Leave out empty groups. If there's nothing at all: `Nothing open.`
+Add ` (weekly)` after the title of any item whose `source_ref` starts with `recur-` (select `source_ref` too). Leave out empty groups. If there's nothing at all: `Nothing open.`
 
 ---
 
@@ -121,3 +127,79 @@ Leave out empty groups. If there's nothing at all: `Nothing open.`
    3. Then run `select status from public.intake_withdraw('<id>', '<that event id>');`
    4. If the delete fails, stop and report it. Don't withdraw the request.
 5. **Reply** `Dropped GMAT prep.`, or `Dropped GMAT prep and removed it from your calendar.`
+
+---
+
+## 4. Weekly recurring items
+
+### Create: "every week I need…"
+Work out the template:
+
+| Field | Rule |
+|---|---|
+| `title` | As with a one-off. |
+| `duration_min` | **Always ask** if he didn't say. |
+| `source_agent` | As with a one-off. |
+| Window | Start weekday and time, and end weekday and time, in Abu Dhabi time. Weekdays are ISO: 1 = Mon … 7 = Sun, and the window must end later in the same Mon–Sun week. "Thursday after work or Friday" means Thu 18:00 → Fri 23:59. A single day with no time means that day 07:00–22:00. |
+| Flexibility and priority | Same rules and defaults as a one-off. |
+| `starts_on` | The Monday of the first week to post. **This Monday**, unless this week's window has already ended, or an open request for the same thing already exists this week. Check with the section 1 duplicate query. If so, use **next Monday**, so this week is never doubled. |
+
+Confirm with one line, and write only after a clear yes:
+```
+Weekly · Personal · Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23:59 · flexible · P1 · from 5 Oct — set it up?
+```
+Then write:
+```sql
+select id, starts_on from public.intake_add_recurring('<personal|prntcode>', '<title>', <duration_min>,
+  <start_dow>::smallint, '<HH:MM>', <end_dow>::smallint, '<HH:MM>', '<flexibility>', <priority>::smallint,
+  '<starts_on YYYY-MM-DD>'::date, <'context' or null>);
+```
+Reply: `Set up. Each week's copy appears in the 07:00 digest, marked (weekly).`
+
+The daily run posts this week's and next week's copies automatically, and never twice.
+
+### "What repeats?"
+```sql
+select title, duration_min, window_start_dow, window_start_time, window_end_dow, window_end_time, priority from public.recurring where active order by window_start_dow, window_start_time;
+```
+Show one line each, e.g. `· Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23:59 · P1`. If there are none: `Nothing repeats.`
+
+### Skip one week: "skip the Dubai drive this week" or "…next week"
+1. Find the template.
+2. Work out the week's Monday.
+3. Find that week's copy:
+   ```sql
+   select id, status, slot_start, calendar_event_id from public.requests where source_ref = public.recurring_source_ref('<template id>', '<monday>'::date);
+   ```
+4. Confirm: `Skip Drive back to Dubai for the week of 5 Oct? The weekly item stays on.`
+   - If that copy is `scheduled`, add: `This also removes it from your Coordinator calendar.`
+5. On yes:
+   - If the copy is `scheduled`: delete its event from the **Coordinator** calendar first (`notificationLevel: "NONE"`), then pass that event ID.
+   - Run:
+     ```sql
+     select status from public.intake_skip_recurring_week('<template id>', '<monday>'::date, <'event id' or null>);
+     ```
+   - This works whether or not the copy has been posted yet.
+6. Reply: `Skipped this week.`
+
+### Stop: "stop the Dubai drive"
+1. Confirm: `Stop the weekly Drive back to Dubai? Copies already in your list stay; drop them separately if you want.`
+2. On yes, run `select active from public.intake_stop_recurring('<template id>');`.
+3. Reply: `Stopped.`
+
+---
+
+## 5. Edit a waiting item: "make GMAT 3h", "move it to P1", "due Friday instead"
+1. Find the item among the open requests.
+   - If it's `scheduled`, **refuse**: `GMAT prep is already booked (Tue 20:00). Drop it and re-add?`
+2. Show the updated one-line confirmation, with the change applied:
+   ```
+   Personal · GMAT prep · 3h · by Sun 4 Oct · flexible · P3 — update it?
+   ```
+   - If the item was `proposed`, add: `(its proposed slot will be cleared and re-placed at the next run)`.
+3. On yes, run the update. Pass only the fields that change and leave the rest null:
+   ```sql
+   select status, duration_min, priority, due_by from public.intake_update('<id>', p_duration_min => 180);
+   ```
+   The other named parameters are `p_title`, `p_earliest_start`, `p_due_by`, `p_flexibility`, `p_priority` (as `::smallint`) and `p_source_agent`.
+4. Reply: `Updated.`, or `Updated — it'll be re-placed at 07:00 (or say "place it now").`

@@ -1,6 +1,6 @@
 ---
 name: coordinator
-description: Khaled's Coordinator, which owns his calendar. Use it for the daily placement run (the 07:00 scheduled task, "run the coordinator", "daily run", "place it now") and for approval replies to a Coordinator digest ("approve 1 3", "approve all", "approve none", "keep 4"). It reads new time requests from the Supabase ledger, proposes slots, sends a short numbered digest, and writes approved blocks to the "Coordinator" Google calendar only. Adding, listing or withdrawing requests from chat is the intake skill, not this one.
+description: Khaled's Coordinator, which owns his calendar. Use it only for the daily placement run (the 07:00 scheduled task, "run the coordinator", "daily run", "place it now") and for approval replies to a Coordinator digest ("approve 1 3", "approve all", "approve none", "keep 4"). It proposes slots for requests in the Supabase ledger, sends a short numbered digest, and writes approved blocks to the "Coordinator" Google calendar only. Any NEW ask for time ("I need time to…", "put X in my calendar", "block…") goes to the intake skill first, as do edits, weekly items and withdrawals.
 ---
 
 # Coordinator
@@ -26,6 +26,7 @@ You place blocks of Khaled's time. Domain agents post requests to the ledger. Yo
 If they aren't loaded yet, search for them with tool search. If either connector is missing or not connected, stop and tell Khaled which one to connect under **Customize → Connectors**. Never fall back to guessing.
 
 ## Safety rules (never break)
+0. **A time request never becomes a calendar event directly.** A new ask for time goes to the **intake** skill, which records it in the ledger. Events come only from section B, after Khaled approves a digest.
 1. **Only write to the Coordinator calendar.** Pass its `calendarId` on every `create_event` and `delete_event` call. Never write, move or delete anything on the personal or PRNTCODE calendars, or any event Khaled created himself.
 2. **Nothing goes on a calendar without Khaled's approval** in a reply to the digest.
 3. **Never `update` the `requests` table directly.** All Coordinator writes go through the checked SQL functions below. If a function raises an error, don't work around it: report it in the digest.
@@ -58,6 +59,7 @@ On every `create_event` and `delete_event`, set `notificationLevel: "NONE"`.
 2. **Housekeeping**, as separate calls.
    - Run `select id, title from public.coordinator_mark_done();` and count the rows it returns.
    - Read `select * from public.coordinator_changed_since_decision;`. These are **flags**. Don't move them; list them in the digest.
+   - Post the weekly items: `select id, title from public.coordinator_post_recurring();`. This posts this week's and next week's copy of each active weekly template, never twice. The new rows are ordinary `new` requests and get placed in step 5.
 3. **Read the work.**
    - Active rules: `select owner_agent, rule, kind from public.rules where active order by kind, owner_agent;`
    - New requests: `select * from public.requests where status = 'new' order by priority, due_by nulls last, created_at;`
@@ -113,6 +115,7 @@ Decline with a reason: "approve 1; 2 too late". "keep 4" keeps a changed item.
 ```
 - End the reply line with `(ref <first 8 characters of this run's id>)`. The ref ties Khaled's reply to exactly this digest.
 - The line format is `<n>. <Personal|PRNTCODE>: <title in lower case> — <Day HH:MM–HH:MM> (<due Day | fixed | anytime>)`.
+- For a weekly item (`source_ref` starts with `recur-`), put `weekly, ` inside the brackets, e.g. `(weekly, due Fri)`.
 - Leave out the `Bumped:` and `Changed since booked:` lines when there is nothing to show.
 - If there is nothing to propose, the whole digest is one line: `Coordinator · Sun 27 Sep — nothing to propose today.` Add the bumped and changed lines if there are any.
 

@@ -4,7 +4,7 @@ description: Run the Coordinator's daily placement run and send the numbered dig
 
 Use the **coordinator** skill and do section **A. Daily run** exactly as written:
 1. Log the run.
-2. Do the housekeeping.
+2. Do the housekeeping, including posting this week's and next week's copies of weekly items.
 3. Read the ledger and all three calendars.
 4. Propose or bump each request through the checked SQL functions.
 5. Finish the run log.
