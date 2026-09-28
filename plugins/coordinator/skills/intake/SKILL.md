@@ -1,6 +1,6 @@
 ---
 name: intake
-description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It also handles reminders: "remind me to…", "remind me after work to…", "nudge me at 5 to…", "what reminders do I have?", "cancel the X reminder". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger, and sets reminders on his Coordinator calendar. Never create calendar events directly for time requests; the Coordinator books time only after Khaled approves.
+description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week / every other week / every 3 weeks I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It also handles reminders, which go to Todoist: "remind me to…", "remind me after work to…", "remind me every Monday at 9 to…", "nudge me at 5 to…", "what reminders do I have?", "cancel the X reminder". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger, and sets reminders as Todoist tasks. Never create calendar events directly for time requests; the Coordinator books time only after Khaled approves.
 ---
 
 # Intake
@@ -9,7 +9,7 @@ Khaled tells you what time he needs, and you record it in the Coordinator's ledg
 
 **Golden rule:** a time request **never** becomes a calendar event directly, not even "just this once" and not even if Khaled says "put it in my calendar". It always goes into the ledger through this skill. Events only ever come from the Coordinator, after Khaled approves its digest. If he needs it placed right away, offer **"place it now"**, which runs the Coordinator immediately.
 
-**The one exception is reminders (section 6).** A reminder is a nudge at a moment, not a block of time. After Khaled's one-line "yes", you create it directly as a short `[Reminder]` event on the **Coordinator** calendar. Nothing else ever skips the digest.
+**Reminders are different (section 6).** A reminder is a nudge at a moment, not a block of time. After Khaled's one-line "yes", you create it as a **Todoist task** with a due time. It never goes on any calendar through this skill; Todoist's own sync puts it on the separate "Todoist" calendar, which the Coordinator ignores. **Never create `[Reminder]` events on the Coordinator calendar.** Those were retired in v1.4.
 
 **Reminder or time request?**
 - "Remind me to X", "nudge me to X" or "don't let me forget X" is a **reminder**.
@@ -26,14 +26,14 @@ Khaled is usually on his phone. Keep every reply to one or two lines, with no ch
 
 ## Tools and fixed facts
 - **Supabase connector:** `execute_sql` on project `hgkreprqxevayruqpibf`. Send **one SQL statement per call**.
-- **Google Calendar connector:** used only to delete the event of a scheduled item Khaled withdraws or skips, and to create and delete reminder events (section 6).
+- **Google Calendar connector:** used only to delete the event of a scheduled item Khaled withdraws or skips.
+- **Todoist connector:** used for reminders (section 6): `add-tasks`, `find-reminders`, `add-reminders`, `find-tasks`, `find-tasks-by-date`, `fetch-object` and `delete-object`. Khaled is on **Todoist Free**, and his Todoist timezone is Asia/Dubai.
   - The Coordinator calendar is the one whose summary, trimmed, is `Coordinator`: `4f0f7f079667e9b74eb5605d03065375d94f32de53fa7548afbb4d354b0f50da@group.calendar.google.com`.
   - If `list_calendars` doesn't show that ID under that name, stop and say so.
 - **Timezone:** Khaled is in Abu Dhabi (`Asia/Dubai`, UTC+4). Store UTC, and show Abu Dhabi time.
 - **Never insert or update `requests` or `recurring` directly.** Use only the checked functions:
   - `intake_add_request`, `intake_update`, `intake_withdraw`
   - `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`
-  - `intake_add_reminder`, `intake_cancel_reminder`
 
 If a tool isn't loaded, find it with tool search. If a connector isn't connected, tell Khaled which one to connect.
 
@@ -120,13 +120,11 @@ Scheduled this week (1)
 ```
 Add ` (weekly)` after the title of any item whose `source_ref` starts with `recur-` (select `source_ref` too). Leave out empty groups. If there's nothing at all: `Nothing open.`
 
-Also list upcoming reminders at the end, if there are any:
-```sql
-select title, remind_at from public.reminders where status = 'set' and remind_at > now() order by remind_at limit 10;
-```
+Also list upcoming reminders at the end, if there are any. Use the Todoist connector's `find-tasks-by-date` with `startDate: "today"`, `daysCount: 14`, `overdueOption: "exclude-overdue"`, and keep only tasks with a due **time**:
 ```
 Reminders (1)
 · Fix phone screen · Mon 18:15
+· Review PRNTCODE numbers · Mon 09:00 (weekly)
 ```
 
 ---
@@ -148,9 +146,9 @@ Reminders (1)
 
 ---
 
-## 4. Weekly recurring items
+## 4. Recurring items (every week, or every N weeks)
 
-### Create: "every week I need…"
+### Create: "every week I need…" / "every other week…" / "every 3 weeks…"
 Work out the template:
 
 | Field | Rule |
@@ -160,32 +158,35 @@ Work out the template:
 | `source_agent` | As with a one-off. |
 | Window | Start weekday and time, and end weekday and time, in Abu Dhabi time. Weekdays are ISO: 1 = Mon … 7 = Sun, and the window must end later in the same Mon–Sun week. "Thursday after work or Friday" means Thu 18:00 → Fri 23:59. A single day with no time means that day 07:00–22:00. |
 | Flexibility and priority | Same rules and defaults as a one-off. |
-| `starts_on` | The Monday of the first week to post. **This Monday**, unless this week's window has already ended, or an open request for the same thing already exists this week. Check with the section 1 duplicate query. If so, use **next Monday**, so this week is never doubled. |
+| `interval_weeks` | "every week" or "weekly" is 1, "every other week", "every 2 weeks" or "fortnightly" is 2, "every 3 weeks" is 3, and so on up to 8. **Default: 1.** Monthly or date-based repeats ("1st of each month") aren't supported: say so. |
+| `starts_on` | The Monday of the first week to post. It is also the anchor, so with interval 2 the item happens in that week, then every 2nd week after it. **This Monday**, unless this week's window has already ended, or an open request for the same thing already exists this week. Check with the section 1 duplicate query. If so, use **next Monday**, so this week is never doubled. |
 
 Confirm with one line, and write only after a clear yes:
 ```
 Weekly · Personal · Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23:59 · flexible · P1 · from 5 Oct — set it up?
+Every 2 weeks · Personal · Haircut · 1h · Fri 09:00 → Sat 20:00 · flexible · P3 · from 28 Sep — set it up?
 ```
 Then write:
 ```sql
-select id, starts_on from public.intake_add_recurring('<personal|prntcode>', '<title>', <duration_min>,
+select id, starts_on, interval_weeks from public.intake_add_recurring('<personal|prntcode>', '<title>', <duration_min>,
   <start_dow>::smallint, '<HH:MM>', <end_dow>::smallint, '<HH:MM>', '<flexibility>', <priority>::smallint,
-  '<starts_on YYYY-MM-DD>'::date, <'context' or null>);
+  '<starts_on YYYY-MM-DD>'::date, <'context' or null>, <interval_weeks>::smallint);
 ```
-Reply: `Set up. Each week's copy appears in the 07:00 digest, marked (weekly).`
+Reply: `Set up. Each copy appears in the 07:00 digest, marked (weekly) or (every 2 weeks).`
 
-The daily run posts this week's and next week's copies automatically, and never twice.
+The daily run posts this week's and next week's copies automatically, **only in the weeks the item happens in**, and never twice.
 
 ### "What repeats?"
 ```sql
-select title, duration_min, window_start_dow, window_start_time, window_end_dow, window_end_time, priority from public.recurring where active order by window_start_dow, window_start_time;
+select title, duration_min, interval_weeks, window_start_dow, window_start_time, window_end_dow, window_end_time, priority from public.recurring where active order by window_start_dow, window_start_time;
 ```
-Show one line each, e.g. `· Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23:59 · P1`. If there are none: `Nothing repeats.`
+Show one line each, with the interval, e.g. `· Drive back to Dubai · weekly · 1.5h · Thu 18:00 → Fri 23:59 · P1` or `· Haircut · every 2 weeks · 1h · Fri 09:00 → Sat 20:00 · P3`. Add repeating Todoist reminders under a `Reminders` line: use `find-tasks` with `filter: "recurring"`. If there are none: `Nothing repeats.`
 
 ### Skip one week: "skip the Dubai drive this week" or "…next week"
 1. Find the template.
 2. Work out the week's Monday.
-3. Find that week's copy:
+3. If the item doesn't happen that week (every-N-weeks), say so: `Haircut isn't on that week (every 2 weeks).` The function refuses it anyway.
+4. Find that week's copy:
    ```sql
    select id, status, slot_start, calendar_event_id from public.requests where source_ref = public.recurring_source_ref('<template id>', '<monday>'::date);
    ```
@@ -224,9 +225,9 @@ Show one line each, e.g. `· Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23
 
 ---
 
-## 6. Reminders: "Remind me after work to fix my phone screen"
+## 6. Reminders (Todoist): "Remind me after work to fix my phone screen"
 
-A reminder is a 15-minute `[Reminder]` event on the **Coordinator calendar only**. It carries an alert at that moment and is marked **free**, so it never blocks the Coordinator's placement. It shows up in Apple Calendar through Khaled's Google account.
+A reminder is a **Todoist task with a due date and time**, in Khaled's **Inbox**, unless he confirms another project. Todoist alerts him on his phone at that time. **Don't create any calendar event.** Todoist syncs timed tasks to its own "Todoist" Google calendar, and the Coordinator ignores that calendar.
 
 ### Work out the time (Abu Dhabi time)
 | He says | Time |
@@ -236,41 +237,40 @@ A reminder is a 15-minute `[Reminder]` event on the **Coordinator calendar only*
 | "tomorrow morning" | 08:00 tomorrow |
 | "tomorrow" (no time) | 09:00 tomorrow on Fri–Sun; 18:15 on Mon–Thu (after the fund) |
 | "at 5", "at 17:30", "Thursday 4pm" | Exactly that. For a bare hour from 1 to 7, assume pm. |
-| "in 2 hours" | Now + 2h, rounded to the next 5 minutes |
+| "in 5 minutes", "in 2 hours" | Now + that |
 | no time at all ("remind me to call mum") | Ask `When?`. Don't guess. |
+| repeating: "every Monday at 9", "every weekday at 8", "every other Friday at 5" | A Todoist recurring due string, e.g. `every monday at 9:00`. Monthly phrasing ("every 1st at 9") also works in Todoist, so accept it for reminders. |
 
-The time must be in the future. Repeating reminders ("every Monday remind me…") aren't supported yet. Say so, and offer a one-off instead.
+A one-off time must be in the future.
 
 ### Confirm with one line, then create only after "yes"
 ```
 Reminder · Fix phone screen · Mon 28 Sep 18:15 — set it?
+Reminder · Review PRNTCODE numbers · every Monday 09:00 — set it?
 ```
-He can correct it ("make it 7pm") and you show the line again. On "no", reply `Not set.`
+He can correct it ("make it 7pm", "put it in Work") and you show the line again. On "no", reply `Not set.`
 
 ### Create (on yes)
-1. Call `create_event` with:
-   - `calendarId`: the **Coordinator** calendar
-   - `summary`: `[Reminder] <title>`
-   - `startTime`: the time, and `endTime`: 15 minutes later, both in Abu Dhabi time
-   - `timeZone`: `Asia/Dubai`
-   - `availability`: `AVAILABILITY_FREE`
-   - `overrideReminders`: `[{"method":"popup","minutes":0}]`
-   - `description`: `Reminder set from chat by Khaled.`
-   - `notificationLevel`: `NONE`
-   - no attendees and no Meet link
-2. Record it:
-   ```sql
-   select id from public.intake_add_reminder('<title>', '<time UTC>Z'::timestamptz, '<event id>');
-   ```
-   If this fails, delete the event you just created so the calendar and the ledger never disagree.
-3. Reply: `Set — Mon 18:15.`
+1. Call `add-tasks` with:
+   - `content`: the title
+   - `dueString`: an explicit date and time, e.g. `2026-09-28 18:15`, or the recurrence, e.g. `every monday at 9:00`
+   - `projectId`: `inbox`, unless he named a project (then find its ID with `find-projects`)
+   - no duration, no labels, priority left as default
+2. **Make sure it alerts.** Call `find-reminders` with the new task's ID.
+   - Todoist normally adds an at-due-time reminder automatically, so there's usually one already. **Don't add a second one**, or he'll be alerted twice.
+   - If there are none, call `add-reminders` with `type: "relative"`, `minuteOffset: 0`, `service: "push"`.
+   - If that call fails because his plan doesn't allow reminders, tell him plainly: `Added to Todoist for 18:15, but your plan won't send an alert.` Don't work around it.
+3. Reply: `Set — Mon 18:15.`, or `Set — every Monday 09:00.`
 
 ### "What reminders do I have?"
-Use the reminders query in section 2 and show one line each. If there are none: `No reminders set.`
+Use the Todoist listing from section 2: one line each, with times in Abu Dhabi time, and recurring ones marked. If there are none: `No reminders set.`
 
 ### Cancel: "cancel the phone screen reminder"
-1. Find it among the `set` reminders. Ask which one if several match.
+1. Find it with `find-tasks` and `searchText`. Ask which one if several match.
 2. Confirm: `Cancel reminder Fix phone screen (Mon 18:15)?`
-3. On yes, read its `calendar_event_id`, then delete that event from the **Coordinator** calendar with `notificationLevel: "NONE"`.
-4. Run `select status from public.intake_cancel_reminder('<id>', '<that event id>');`.
-5. Reply: `Cancelled.`
+   - For a recurring one, add: `This stops all future ones.`
+3. On yes, call `delete-object` with `type: "task"` and the task's ID.
+4. Reply: `Cancelled.`
+
+### Retired: calendar reminders
+v1.3 put `[Reminder]` events on the Coordinator calendar and recorded them in the `reminders` table. That's retired. Never create those events, and never write to that table; its write functions no longer exist.

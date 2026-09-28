@@ -202,13 +202,17 @@ Until the Personal and PRNTCODE agents are connected, you feed the Coordinator y
 | `Make GMAT 3h` · `move it to P1` · `due Friday instead` | Edits an item that's waiting or proposed, after a one-line confirmation. A proposed item goes back to waiting and is placed again. A booked item can't be edited; you drop it and re-add it. |
 | `Every week I drive back to Dubai Thursday after work or Friday, 1.5h, P1` | Sets up a **weekly** item after confirmation. Each week's copy appears in the digest marked `(weekly)`. |
 | `Skip the Dubai drive this week` | Drops only this week's copy. The weekly item stays on. |
-| `Stop the Dubai drive` | Turns the weekly item off. |
-| `What repeats?` | Lists your weekly items. |
+| `Haircut every other week, 1h, Fri or Sat daytime` | Sets up an **every-N-weeks** item: every week, every other week, every 3 weeks, and so on. It's posted only in the weeks it happens and marked `(every 2 weeks)`. |
+| `Stop the Dubai drive` | Turns the recurring item off. |
+| `What repeats?` | Lists your recurring items with their interval, plus any repeating Todoist reminders. |
 
-| `Remind me after work to fix my phone screen` | Sets a **reminder**: after your one-line "yes", a 15-minute `[Reminder]` event with an alert goes straight onto your Coordinator calendar (Mon 18:15 in this example). No digest needed. |
-| `What reminders do I have?` · `Cancel the phone screen reminder` | Lists or cancels upcoming reminders. |
+| `Remind me after work to fix my phone screen` | Sets a **reminder in Todoist**: after your one-line "yes", a Todoist task is created in your Inbox, due Mon 18:15 in this example, and Todoist alerts your phone. No digest needed. |
+| `Remind me every Monday at 9 to review PRNTCODE numbers` | A **repeating** Todoist reminder, using Todoist's own recurrence. |
+| `What reminders do I have?` · `Cancel the phone screen reminder` | Lists or cancels reminders in Todoist. |
 
-**You never have to mention the Coordinator.** Any ask for time, such as "I need time to…", "find time for…", "put X in my calendar" or "block…", goes to intake. **Nothing goes straight onto your calendar,** except reminders you confirm: time blocks only appear after you approve a digest. Reminders are marked "free", so they never block time. They show in Apple Calendar through your Google account, which needs to be added under iPhone Settings → Calendar → Accounts. If something can't wait until 07:00, say "place it now".
+**You never have to mention the Coordinator.** Any ask for time, such as "I need time to…", "find time for…", "put X in my calendar" or "block…", goes to intake. **Nothing goes straight onto your calendar:** time blocks only appear after you approve a digest.
+
+Reminders live in **Todoist**. Todoist's own sync shows timed tasks on a separate "Todoist" Google calendar. The Coordinator never reads that calendar, so a reminder never blocks a time slot. The old v1.3 `[Reminder]` calendar events are retired. If something can't wait until 07:00, say "place it now".
 
 **Defaults, if you don't say:**
 - due in 7 days
@@ -221,12 +225,14 @@ It always asks how long the item takes if you don't say. It asks personal or PRN
 Intake only *records* what you need. The Coordinator decides where it goes, at 07:00 or when you say "place it now". Chat-added items carry `sub_agent = 'khaled'` and a `chat-…` reference.
 
 ### Weekly items
-Weekly templates live in the `recurring` table: title, length, a weekly window such as Thu 18:00 → Fri 23:59, flexibility, priority, and on/off.
+Recurring templates live in the `recurring` table: title, length, a weekly window such as Thu 18:00 → Fri 23:59, flexibility, priority, and on/off.
+
+An `interval_weeks` (1 = weekly, 2 = every other week, up to 8) and an `anchor_week` decide which weeks the item happens in.
 
 Every daily run posts **this week's and next week's** copy of each active template, as ordinary requests with `source_ref = recur-<template id>-<year>-W<week>`. That reference can only exist once per week, so a copy is never posted twice. A skipped week also keeps its reference, so a skip is never undone by the next run.
 
 ### How the writes are kept exact
-Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request`, `intake_update`, `intake_withdraw`, `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`, `intake_add_reminder` and `intake_cancel_reminder`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
+Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request`, `intake_update`, `intake_withdraw`, `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
 - a slot of the wrong length
 - a slot outside the request's window
 - a fixed item not at its fixed time
@@ -248,7 +254,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and calendar reminders, from chat) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and Todoist reminders, from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later
