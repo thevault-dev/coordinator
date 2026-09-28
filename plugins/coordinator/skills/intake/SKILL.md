@@ -1,6 +1,6 @@
 ---
 name: intake
-description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger. Never create calendar events directly for these; the Coordinator books time only after Khaled approves.
+description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It also handles reminders: "remind me to…", "remind me after work to…", "nudge me at 5 to…", "what reminders do I have?", "cancel the X reminder". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger, and sets reminders on his Coordinator calendar. Never create calendar events directly for time requests; the Coordinator books time only after Khaled approves.
 ---
 
 # Intake
@@ -8,6 +8,14 @@ description: ALWAYS use this for any message where Khaled asks for time, or want
 Khaled tells you what time he needs, and you record it in the Coordinator's ledger. The Coordinator places it at its next 07:00 run.
 
 **Golden rule:** a time request **never** becomes a calendar event directly, not even "just this once" and not even if Khaled says "put it in my calendar". It always goes into the ledger through this skill. Events only ever come from the Coordinator, after Khaled approves its digest. If he needs it placed right away, offer **"place it now"**, which runs the Coordinator immediately.
+
+**The one exception is reminders (section 6).** A reminder is a nudge at a moment, not a block of time. After Khaled's one-line "yes", you create it directly as a short `[Reminder]` event on the **Coordinator** calendar. Nothing else ever skips the digest.
+
+**Reminder or time request?**
+- "Remind me to X", "nudge me to X" or "don't let me forget X" is a **reminder**.
+- "I need time to X", "block time for X", "put X in my calendar" or anything with a duration is a **time request**.
+- "Remind me to make time for GMAT" is a time request.
+- If it's genuinely unclear, ask: `Reminder at a time, or a block of time?`
 
 **You only write the top half of a request:** what, how long, by when, how movable, how important.
 - **Never** propose slots or times.
@@ -18,13 +26,14 @@ Khaled is usually on his phone. Keep every reply to one or two lines, with no ch
 
 ## Tools and fixed facts
 - **Supabase connector:** `execute_sql` on project `hgkreprqxevayruqpibf`. Send **one SQL statement per call**.
-- **Google Calendar connector:** used only to delete the event of a scheduled item Khaled withdraws or skips.
+- **Google Calendar connector:** used only to delete the event of a scheduled item Khaled withdraws or skips, and to create and delete reminder events (section 6).
   - The Coordinator calendar is the one whose summary, trimmed, is `Coordinator`: `4f0f7f079667e9b74eb5605d03065375d94f32de53fa7548afbb4d354b0f50da@group.calendar.google.com`.
   - If `list_calendars` doesn't show that ID under that name, stop and say so.
 - **Timezone:** Khaled is in Abu Dhabi (`Asia/Dubai`, UTC+4). Store UTC, and show Abu Dhabi time.
 - **Never insert or update `requests` or `recurring` directly.** Use only the checked functions:
   - `intake_add_request`, `intake_update`, `intake_withdraw`
   - `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`
+  - `intake_add_reminder`, `intake_cancel_reminder`
 
 If a tool isn't loaded, find it with tool search. If a connector isn't connected, tell Khaled which one to connect.
 
@@ -110,6 +119,15 @@ Scheduled this week (1)
 · Gym · Tue 19:00–20:00
 ```
 Add ` (weekly)` after the title of any item whose `source_ref` starts with `recur-` (select `source_ref` too). Leave out empty groups. If there's nothing at all: `Nothing open.`
+
+Also list upcoming reminders at the end, if there are any:
+```sql
+select title, remind_at from public.reminders where status = 'set' and remind_at > now() order by remind_at limit 10;
+```
+```
+Reminders (1)
+· Fix phone screen · Mon 18:15
+```
 
 ---
 
@@ -203,3 +221,56 @@ Show one line each, e.g. `· Drive back to Dubai · 1.5h · Thu 18:00 → Fri 23
    ```
    The other named parameters are `p_title`, `p_earliest_start`, `p_due_by`, `p_flexibility`, `p_priority` (as `::smallint`) and `p_source_agent`.
 4. Reply: `Updated.`, or `Updated — it'll be re-placed at 07:00 (or say "place it now").`
+
+---
+
+## 6. Reminders: "Remind me after work to fix my phone screen"
+
+A reminder is a 15-minute `[Reminder]` event on the **Coordinator calendar only**. It carries an alert at that moment and is marked **free**, so it never blocks the Coordinator's placement. It shows up in Apple Calendar through Khaled's Google account.
+
+### Work out the time (Abu Dhabi time)
+| He says | Time |
+|---|---|
+| "after work" | 18:15 on the next workday (Mon–Fri): today if it's a weekday before 18:15, otherwise the next weekday |
+| "tonight" or "this evening" | 20:00 today, or tomorrow if it's already past 20:00 |
+| "tomorrow morning" | 08:00 tomorrow |
+| "tomorrow" (no time) | 09:00 tomorrow on Fri–Sun; 18:15 on Mon–Thu (after the fund) |
+| "at 5", "at 17:30", "Thursday 4pm" | Exactly that. For a bare hour from 1 to 7, assume pm. |
+| "in 2 hours" | Now + 2h, rounded to the next 5 minutes |
+| no time at all ("remind me to call mum") | Ask `When?`. Don't guess. |
+
+The time must be in the future. Repeating reminders ("every Monday remind me…") aren't supported yet. Say so, and offer a one-off instead.
+
+### Confirm with one line, then create only after "yes"
+```
+Reminder · Fix phone screen · Mon 28 Sep 18:15 — set it?
+```
+He can correct it ("make it 7pm") and you show the line again. On "no", reply `Not set.`
+
+### Create (on yes)
+1. Call `create_event` with:
+   - `calendarId`: the **Coordinator** calendar
+   - `summary`: `[Reminder] <title>`
+   - `startTime`: the time, and `endTime`: 15 minutes later, both in Abu Dhabi time
+   - `timeZone`: `Asia/Dubai`
+   - `availability`: `AVAILABILITY_FREE`
+   - `overrideReminders`: `[{"method":"popup","minutes":0}]`
+   - `description`: `Reminder set from chat by Khaled.`
+   - `notificationLevel`: `NONE`
+   - no attendees and no Meet link
+2. Record it:
+   ```sql
+   select id from public.intake_add_reminder('<title>', '<time UTC>Z'::timestamptz, '<event id>');
+   ```
+   If this fails, delete the event you just created so the calendar and the ledger never disagree.
+3. Reply: `Set — Mon 18:15.`
+
+### "What reminders do I have?"
+Use the reminders query in section 2 and show one line each. If there are none: `No reminders set.`
+
+### Cancel: "cancel the phone screen reminder"
+1. Find it among the `set` reminders. Ask which one if several match.
+2. Confirm: `Cancel reminder Fix phone screen (Mon 18:15)?`
+3. On yes, read its `calendar_event_id`, then delete that event from the **Coordinator** calendar with `notificationLevel: "NONE"`.
+4. Run `select status from public.intake_cancel_reminder('<id>', '<that event id>');`.
+5. Reply: `Cancelled.`

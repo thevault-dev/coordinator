@@ -205,7 +205,10 @@ Until the Personal and PRNTCODE agents are connected, you feed the Coordinator y
 | `Stop the Dubai drive` | Turns the weekly item off. |
 | `What repeats?` | Lists your weekly items. |
 
-**You never have to mention the Coordinator.** Any ask for time, such as "I need time to…", "find time for…", "put X in my calendar" or "block…", goes to intake. **Nothing goes straight onto your calendar:** events only appear after you approve a digest. If something can't wait until 07:00, say "place it now".
+| `Remind me after work to fix my phone screen` | Sets a **reminder**: after your one-line "yes", a 15-minute `[Reminder]` event with an alert goes straight onto your Coordinator calendar (Mon 18:15 in this example). No digest needed. |
+| `What reminders do I have?` · `Cancel the phone screen reminder` | Lists or cancels upcoming reminders. |
+
+**You never have to mention the Coordinator.** Any ask for time, such as "I need time to…", "find time for…", "put X in my calendar" or "block…", goes to intake. **Nothing goes straight onto your calendar,** except reminders you confirm: time blocks only appear after you approve a digest. Reminders are marked "free", so they never block time. They show in Apple Calendar through your Google account, which needs to be added under iPhone Settings → Calendar → Accounts. If something can't wait until 07:00, say "place it now".
 
 **Defaults, if you don't say:**
 - due in 7 days
@@ -223,7 +226,7 @@ Weekly templates live in the `recurring` table: title, length, a weekly window s
 Every daily run posts **this week's and next week's** copy of each active template, as ordinary requests with `source_ref = recur-<template id>-<year>-W<week>`. That reference can only exist once per week, so a copy is never posted twice. A skipped week also keeps its reference, so a skip is never undone by the next run.
 
 ### How the writes are kept exact
-Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request`, `intake_update`, `intake_withdraw`, `intake_add_recurring`, `intake_skip_recurring_week` and `intake_stop_recurring`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
+Neither the Coordinator nor intake edits the `requests` table directly. Intake uses `intake_add_request`, `intake_update`, `intake_withdraw`, `intake_add_recurring`, `intake_skip_recurring_week`, `intake_stop_recurring`, `intake_add_reminder` and `intake_cancel_reminder`, and the Coordinator calls its own checked database functions, `coordinator_propose`, `coordinator_bump`, `coordinator_schedule`, `coordinator_decline`, `coordinator_acknowledge` and `coordinator_mark_done`, which refuse a bad write:
 - a slot of the wrong length
 - a slot outside the request's window
 - a fixed item not at its fixed time
@@ -245,7 +248,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests from chat) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and calendar reminders, from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later
