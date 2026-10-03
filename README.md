@@ -39,7 +39,14 @@ Each row has two halves. Each agent fills in only its own half.
 | `calendar_event_id` | The ID of the calendar event, once one exists. |
 | `decision_note` | The Coordinator's reason, e.g. "Moved to Tuesday: clashes with a board call." |
 
-**Housekeeping, filled in automatically:** `id`, `created_at`, `updated_at`. `updated_at` refreshes itself every time a row is edited.
+**Closing the source item** (added 3 Oct 2026)
+
+| Field | What it means |
+|---|---|
+| `resolution` | Khaled's verdict from the digest: `done_elsewhere` or `not_needed`. Empty otherwise. Written by the Coordinator. |
+| `tracker_closed_at` | When the domain agent closed the item in its own tracker (PRNTCODE: the Notion task). Stamped only by `agent_mark_tracker_closed`. |
+
+**Housekeeping, filled in automatically:** `id`, `created_at`, `updated_at`. `updated_at` refreshes itself every time a row is edited, except an edit that only changes `resolution` or `tracker_closed_at` (those don't count as the request changing).
 
 ### `rules`: standing constraints
 
@@ -241,6 +248,16 @@ Neither the Coordinator nor intake edits the `requests` table directly. Intake u
 - approving a slot that has changed since the digest
 
 Every run is logged in `coordinator_runs`, including the digest numbering. Each digest ends with a short `ref`, so `approve 2` always means exactly the item shown as 2 in *that* digest.
+
+### Domain agents' own functions
+Domain agents also write through checked functions, each limited to their own rows:
+
+| Function | Who calls it | What it does |
+|---|---|---|
+| `agent_withdraw(source_agent, source_ref, reason)` | a domain agent, on its own rows | `new`/`proposed` → `declined`, note `withdrawn by <agent>: <reason>`. Refuses booked (`scheduled`) and missing rows. |
+| `agent_mark_tracker_closed(request_id)` | the PRNTCODE agent | stamps `tracker_closed_at` after it closed the Notion task. Refuses non-`prntcode` and missing rows; safe to repeat. |
+
+**Closing a PRNTCODE task from the digest** (Coordinator side is the next brief): set the row's `resolution`, then hand over in the same chat with `close PRNTCODE task <source_ref> as <done|not_needed>: <reason>`. The exact contract is in the [prntcode-ceo README](https://github.com/thevault-dev/prntcode-ceo#handoff-contract-for-the-coordinator). If the instant close fails, the PRNTCODE sync finds rows with `resolution` set and no `tracker_closed_at` and closes them on its next run.
 
 ### Changing the rules
 Standing rules live in the `rules` table, in plain English. `hard` rules are never broken; `soft` rules can be broken, but only with a reason in the decision note. To change one, add a migration, or ask Claude to add, edit or deactivate a rule.

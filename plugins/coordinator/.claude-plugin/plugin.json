@@ -1,7 +1,7 @@
 {
   "name": "coordinator",
   "displayName": "Coordinator",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Owns Khaled's calendar. Reads time requests from the Supabase ledger, proposes slots against his rules and three calendars, sends a short numbered digest, and books only what he approves on the Coordinator calendar. Khaled can add, edit, repeat (every N weeks), list and withdraw requests, and set Todoist reminders, from chat (intake). Needs the Google Calendar, Supabase and Todoist connectors.",
   "author": { "name": "Khaled" },
   "license": "UNLICENSED"

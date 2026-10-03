@@ -11,6 +11,8 @@ declare
   n   integer;
   ts  timestamptz;
   rls boolean;
+  r   public.requests;
+  e   text;
 begin
   -- 1. Unknown status is rejected
   begin
@@ -80,6 +82,56 @@ begin
     raise exception 'FAIL 6: anon/authenticated can read a ledger table';
   end if;
   raise notice 'PASS 6: anon and authenticated have no read access';
+
+  -- 7. agent_withdraw: new -> declined with note; refuses scheduled and missing rows
+  insert into public.requests (source_agent, sub_agent, source_ref, title, duration_min)
+  values ('prntcode', 'chief_of_staff', 'dod-withdraw', 'dod withdraw', 30);
+  r := public.agent_withdraw('prntcode', 'dod-withdraw', 'task marked done');
+  if r.status <> 'declined' or r.decision_note <> 'withdrawn by prntcode: task marked done' then
+    raise exception 'FAIL 7: agent_withdraw did not decline with the right note';
+  end if;
+  insert into public.requests (source_agent, source_ref, title, duration_min, status,
+                               slot_start, slot_end, calendar_event_id, decided_at)
+  values ('prntcode', 'dod-withdraw-booked', 'dod booked', 30, 'scheduled',
+          now() + interval '1 day', now() + interval '1 day 30 minutes', 'evt_dod', now());
+  begin perform public.agent_withdraw('prntcode', 'dod-withdraw-booked', 'x'); e := 'ok';
+  exception when others then e := 'refused'; end;
+  if e <> 'refused' then raise exception 'FAIL 7: agent_withdraw accepted a scheduled row'; end if;
+  begin perform public.agent_withdraw('prntcode', 'dod-missing', 'x'); e := 'ok';
+  exception when others then e := 'refused'; end;
+  if e <> 'refused' then raise exception 'FAIL 7: agent_withdraw accepted a missing row'; end if;
+  raise notice 'PASS 7: agent_withdraw declines new rows, refuses booked and missing ones';
+
+  -- 8. resolution / tracker_closed_at / agent_mark_tracker_closed
+  insert into public.requests (source_agent, sub_agent, source_ref, title, duration_min, updated_at)
+  values ('prntcode', 'chief_of_staff', 'dod-close', 'dod close', 30, '2000-01-01')
+  returning * into r;
+  update public.requests set resolution = 'not_needed' where id = r.id;
+  r := public.agent_mark_tracker_closed(r.id);
+  if r.tracker_closed_at is null then raise exception 'FAIL 8: tracker_closed_at not stamped'; end if;
+  if r.updated_at <> '2000-01-01' then raise exception 'FAIL 8: resolution/stamp bumped updated_at'; end if;
+  if (public.agent_mark_tracker_closed(r.id)).tracker_closed_at <> r.tracker_closed_at then
+    raise exception 'FAIL 8: second stamp changed tracker_closed_at';
+  end if;
+  begin update public.requests set resolution = 'banana' where id = r.id; e := 'ok';
+  exception when check_violation then e := 'refused'; end;
+  if e <> 'refused' then raise exception 'FAIL 8: resolution = banana accepted'; end if;
+  insert into public.requests (source_agent, source_ref, title, duration_min)
+  values ('personal', 'dod-close-personal', 'dod personal', 30) returning * into r;
+  begin perform public.agent_mark_tracker_closed(r.id); e := 'ok';
+  exception when others then e := 'refused'; end;
+  if e <> 'refused' then raise exception 'FAIL 8: agent_mark_tracker_closed stamped a personal row'; end if;
+  raise notice 'PASS 8: resolution checked, stamp is prntcode-only, idempotent and leaves updated_at alone';
+
+  -- 9. Domain-agent functions are service_role only
+  if exists (
+    select 1 from information_schema.routine_privileges
+     where routine_schema = 'public'
+       and routine_name in ('agent_withdraw', 'agent_mark_tracker_closed')
+       and grantee in ('anon', 'authenticated', 'PUBLIC')) then
+    raise exception 'FAIL 9: an agent_* function is executable beyond service_role';
+  end if;
+  raise notice 'PASS 9: agent_* functions are service_role only';
 
   raise notice 'ALL LEDGER CHECKS PASSED';
 end;
