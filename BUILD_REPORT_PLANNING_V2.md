@@ -53,7 +53,7 @@ BUILT and tested live on test data in both repos. **Not on `main` yet**: claude.
 - The refresh only posts what needs time this half-week (due ≤ end of the half-week + 7 days, a D-Day within 21 days, a catch-up, or someone waiting on him).
 
 ## Open questions
-1. **Merge both branches to `main`** (PRs?), then run the Sunday prompt once by hand in claude.ai for the E2E check.
+1. **Merge to `main`:** [coordinator#2](https://github.com/thevault-dev/coordinator/pull/2) and [prntcode-ceo#3](https://github.com/thevault-dev/prntcode-ceo/pull/3). Then run the Sunday prompt once by hand in claude.ai for the E2E check.
 2. **Cleanup needs you.** SQL:
    ```sql
    delete from public.plan_blocks where plan_id = '80fb7b98-c583-4e2a-bfda-f3d44b3ec10e';
