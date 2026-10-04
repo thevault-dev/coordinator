@@ -9,6 +9,65 @@ The agents never talk to each other directly. Everything goes through this ledge
 
 ---
 
+## v2: twice-weekly planning (4 Oct 2026)
+
+The daily digest is retired. Twice a week, on **Sunday and Wednesday at 20:00**, the PRNTCODE refresh runs first and then hands over **in the same chat** with this line:
+
+```
+plan Khaled's half-week
+```
+
+That line (or `/coordinator:plan`, or "plan my week") starts the **plan** skill. It works out the half-week by itself: run on Sun or Mon, it plans **Mon–Wed**; run on Wed or Thu, it plans **Thu–Sun**. Then:
+
+1. **"Anything else booked?"** It shows what it already sees (calendar events and blocks booked earlier) and waits. What you name, such as "tennis Tue 19:00" or "dinner Wed 20:00", becomes **fixed**.
+2. **One overview on one phone screen**, grouped by day. It's built in this order: fixed → held → coached → protected → flexible → (Wednesdays) social & rest → **PRNTCODE focus blocks** → nudges.
+   ```
+   Plan · Mon 12 – Wed 14 Oct
+   Mon  1 20:00–22:00 GMAT
+   Tue  2 19:00–20:00 Tennis (booked)
+        3 20:15–21:45 PRNTCODE focus · 1 task
+   Wed  4 18:30–20:30 GMAT
+        5 20:45–21:45 PRNTCODE focus · 1 task
+   Book with your coach: 3 PT, ideally Mon–Wed 07:30 · 1 more tennis, ideally Thu 19:00
+   Nudge: it's been 2 weeks — book a haircut
+   PRNTCODE: 5h asked → 2 blocks (2.5h) · 1h rolls to Thu–Sun
+   Reply: move / drop / add… · "what's in 3" · "book it"
+   ```
+3. **Adjust in plain words:** "move GMAT to Tue", "drop the run", "no PRNTCODE Wednesday", "skip the drive". It shows the overview again each time.
+4. **"book it"** writes every block to the **Coordinator calendar only**. **Nothing is written before that.**
+5. **Nudges become Todoist reminders** when you confirm them.
+
+Afterwards, in the same chat or any other: "move GMAT to Tue 19:00", "drop the run", "3 done", "3a not needed — reason" (closes the PRNTCODE task via its close-task skill), "tennis booked Thu 19:00" (fills a coached gap), "did my run", "booked the haircut".
+
+On Sundays, the overview opens with `Last week: GMAT 2/2 · PT 3/3 · tennis 1/2 · PRNTCODE 3 blocks`.
+
+### Your routine (activities)
+
+| Type | Meaning | Today |
+|---|---|---|
+| coached | You book it with someone; the Coordinator only nudges | PT 3 × 1h Mon–Wed before work (done by 08:30) · Tennis 2 × 1h evenings |
+| protected | Placed early, hard to bump | GMAT 2 × 2h, Mon–Wed |
+| flexible | Fits around everything | Swim 1 × 1h · Run 1 × 45m |
+| nudge | An action, timed from `last_done` | Haircut every 2 weeks |
+| held | Time held by default; you confirm it | Drive back to Dubai, Thu 18:00 |
+
+You can say "I've started piano, 1h a week with a teacher", "GMAT class Tuesdays 7pm", "make tennis 3 a week", "stop the run" or "What's my routine?" (the **routine** skill). Each change is confirmed in one line first.
+
+### Scheduled tasks
+- **Switch OFF:** the Cowork task running `/coordinator:daily-run` at **07:00**. If it fires anyway, it now only replies "retired, switch me off".
+- **The new tasks** (Sun 20:00 and Wed 20:00) live on the PRNTCODE side: they run the PRNTCODE refresh, which ends with the handoff line above. The prompts are in `BUILD_REPORT_PLANNING_V2.md`.
+
+### Ledger additions (migration `20261004160000_activities_and_planning_v2`)
+- `recurring` is now the activities registry, with new columns `activity_type`, `sessions_per_week`, `preferred_time`, `booked_with` and `last_done`.
+- `plans` (one row per booked half-week) and `plan_blocks` (every block booked, with the PRNTCODE `request_ids` it covers).
+- Checked functions:
+  - Routine: `intake_add_activity`, `intake_update_activity`, `activity_mark_done`, `activity_next_due`.
+  - Blocks: `coordinator_book_block` (refuses fund hours, the past and overlaps), `coordinator_unbook_block`, `coordinator_plan_housekeeping`.
+  - Requests: `coordinator_resolve` ("done" or "not needed": sets `resolution` and keeps the reason after `: `), `coordinator_release` (old digest proposal → `new`).
+- A PRNTCODE request covered by a focus block becomes `scheduled` with the block's span and event ID. Only the bottom half is touched.
+
+---
+
 ## The two tables
 
 ### `requests`: one row per block of time needed
@@ -123,7 +182,7 @@ Row-level security is switched on for both tables, and the public ("anon") and l
 
 ---
 
-## The Coordinator (v1)
+## The Coordinator (v1, daily digest: retired in v2; kept for reference)
 
 The Coordinator is a **Claude plugin** that lives in this repo (`plugins/coordinator/`). You install it once in claude.ai, and it runs every morning at 07:00 as a **Cowork scheduled task**. You can also run it any time in a regular Chat by typing "run the coordinator".
 
@@ -271,7 +330,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/coordinator/SKILL.md` (the daily run, digest format and approval handling), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and Todoist reminders, from chat) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/plan/SKILL.md` (v2 half-week planning), `skills/routine/SKILL.md` (activities), `skills/coordinator/SKILL.md` (retired digest; old approvals only), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and Todoist reminders, from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later

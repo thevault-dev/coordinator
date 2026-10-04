@@ -1,12 +1,11 @@
 ---
-description: Run the Coordinator's daily placement run and send the numbered digest (used by the 07:00 scheduled task)
+description: RETIRED in v2. The daily 07:00 digest is replaced by twice-weekly planning (/coordinator:plan). Running this only tells Khaled to switch the old scheduled task off.
 ---
 
-Use the **coordinator** skill and do section **A. Daily run** exactly as written:
-1. Log the run.
-2. Do the housekeeping, including posting this week's and next week's copies of weekly items.
-3. Read the ledger and all three calendars.
-4. Propose or bump each request through the checked SQL functions.
-5. Finish the run log.
+The Coordinator's daily digest was **retired in v2** (4 Oct 2026). Planning now happens twice a week (Sunday and Wednesday at 20:00), started by the PRNTCODE refresh, which hands over with `plan Khaled's half-week`.
 
-Your final message is **only the digest**, in the skill's digest format, ending with its `(ref …)`. Khaled reads it on his phone and replies in this conversation to approve. Don't write to any calendar in this step.
+Don't run any placement and don't write anything. Reply with exactly this:
+
+```
+The 07:00 Coordinator digest is retired. Switch this task off: Cowork → Scheduled → the 07:00 Coordinator task (/coordinator:daily-run) → turn it off or delete it. Planning now runs Sun and Wed 20:00 with your PRNTCODE refresh; say "/coordinator:plan" any time to plan now.
+```

@@ -1,9 +1,11 @@
 ---
 name: coordinator
-description: Khaled's Coordinator, which owns his calendar. Use it only for the daily placement run (the 07:00 scheduled task, "run the coordinator", "daily run", "place it now") and for approval replies to a Coordinator digest ("approve 1 3", "approve all", "approve none", "keep 4"). It proposes slots for requests in the Supabase ledger, sends a short numbered digest, and writes approved blocks to the "Coordinator" Google calendar only. Any NEW ask for time ("I need time to…", "put X in my calendar", "block…") goes to the intake skill first, as do edits, weekly items and withdrawals.
+description: The Coordinator's v1 daily digest and digest approvals, RETIRED in v2. Planning now happens twice a week in the plan skill. Use this skill only to answer a reply to an OLD numbered digest that is still open in a chat ("approve 1 3", "approve all", "approve none", "keep 4"). For "run the coordinator", "daily run", "place it now", "plan my week" or "plan Khaled's half-week", use the plan skill instead. Any new ask for time goes to the intake skill, and activities ("I've started piano…", "what's my routine?") go to the routine skill.
 ---
 
-# Coordinator
+# Coordinator (v1 digest, retired in v2)
+
+> **v2 (4 Oct 2026):** the daily 07:00 digest is retired. Planning happens on Sunday and Wednesday evenings with the **plan** skill (`/coordinator:plan`, or the handoff line `plan Khaled's half-week`). Section A below is kept for reference only; **don't run it**. If you're asked to "run the coordinator", run the plan skill. Section B still answers a reply to an old digest that's still open.
 
 You place blocks of Khaled's time. Domain agents post requests to the ledger. You propose where each one goes and send Khaled a short digest. Only the items he approves go on his calendar.
 
@@ -50,7 +52,7 @@ On every `create_event` and `delete_event`, set `notificationLevel: "NONE"`.
 
 ---
 
-## A. Daily run
+## A. Daily run (RETIRED: use the plan skill)
 
 1. **Start the log.** Insert a run row and keep its `id`:
    ```sql
