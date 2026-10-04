@@ -1,6 +1,6 @@
 {
   "name": "thevault-coordinator",
-  "description": "Khaled's Coordinator agent: daily calendar placement from the shared Supabase ledger, with approval by number.",
+  "description": "Khaled's Coordinator agent: twice-weekly half-week planning from the shared Supabase ledger and his activities, booked on the Coordinator calendar.",
   "owner": {
     "name": "Khaled"
   },
@@ -8,7 +8,7 @@
     {
       "name": "coordinator",
       "source": "./plugins/coordinator",
-      "description": "Daily 07:00 digest of proposed time blocks from the ledger; approve by number and approved blocks go on the Coordinator calendar."
+      "description": "Plans each half-week (Sun and Wed evening) as blocks of time: activities by type, PRNTCODE focus blocks and booking nudges. Nothing is booked until Khaled says \"book it\"."
     }
   ]
 }

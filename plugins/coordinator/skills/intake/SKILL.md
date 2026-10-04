@@ -1,13 +1,15 @@
 ---
 name: intake
-description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "every week / every other week / every 3 weeks I need…", "skip / stop the X", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It also handles reminders, which go to Todoist: "remind me to…", "remind me after work to…", "remind me every Monday at 9 to…", "nudge me at 5 to…", "what reminders do I have?", "cancel the X reminder". It records, edits, repeats or withdraws requests in Khaled's Coordinator ledger, and sets reminders as Todoist tasks. Never create calendar events directly for time requests; the Coordinator books time only after Khaled approves.
+description: ALWAYS use this for any message where Khaled asks for time, or wants something in or out of his calendar or schedule, even if he never mentions the Coordinator. For example: "I need time to…", "I need 2 hours for…", "find time for…", "put X in my calendar", "block…", "schedule…", "book…", "I have to [do X] on [day]", "remind me to make time for…", "what repeats?", "make X 3h", "move it to P1", "due Friday instead", "what's on my list?", "drop / cancel the X block". It also handles reminders, which go to Todoist: "remind me to…", "remind me after work to…", "remind me every Monday at 9 to…", "nudge me at 5 to…", "what reminders do I have?", "cancel the X reminder". It records, edits or withdraws one-off requests in Khaled's Coordinator ledger, and sets reminders as Todoist tasks. Recurring activities ("every week I…", "I've started piano", "what's my routine?") belong to the routine skill, and planning ("plan my week") to the plan skill. Never create calendar events directly for time requests; the Coordinator books time only when Khaled says "book it" in a plan.
 ---
 
 # Intake
 
-Khaled tells you what time he needs, and you record it in the Coordinator's ledger. The Coordinator places it at its next 07:00 run.
+Khaled tells you what time he needs, and you record it in the Coordinator's ledger. The Coordinator places it in the next half-week plan (Sunday or Wednesday evening, or straight away with "plan it now").
 
-**Golden rule:** a time request **never** becomes a calendar event directly, not even "just this once" and not even if Khaled says "put it in my calendar". It always goes into the ledger through this skill. Events only ever come from the Coordinator, after Khaled approves its digest. If he needs it placed right away, offer **"place it now"**, which runs the Coordinator immediately.
+> **v2:** recurring **activities** (training, study, coached sessions, haircut-style nudges, the Dubai drive) live in the **routine** skill: "I've started piano…", "what's my routine?", "did my run", "tennis booked Thu 19:00". This skill keeps one-off time requests, edits, withdrawals and Todoist reminders. "Every week / every other week I need…" now goes to the routine skill.
+
+**Golden rule:** a time request **never** becomes a calendar event directly, not even "just this once" and not even if Khaled says "put it in my calendar". It always goes into the ledger through this skill. Events only ever come from the Coordinator, after Khaled approves its digest. If he needs it placed right away, offer **"plan it now"**, which runs the **plan** skill for the current half-week.
 
 **Reminders are different (section 6).** A reminder is a nudge at a moment, not a block of time. After Khaled's one-line "yes", you create it as a **Todoist task** with a due time. It never goes on any calendar through this skill; Todoist's own sync puts it on the separate "Todoist" calendar, which the Coordinator ignores. **Never create `[Reminder]` events on the Coordinator calendar.** Those were retired in v1.4.
 
@@ -84,9 +86,9 @@ select id, source_ref, status from public.intake_add_request(
   <'…Z'::timestamptz or null>, '<due_by UTC>Z'::timestamptz,
   '<flexible|fixed|anytime>', <priority>::smallint, <'context' or null>);
 ```
-Then reply: `Added. The Coordinator will place it at 07:00 — or say "place it now".`
+Then reply: `Added. It goes into your next plan (Sun/Wed evening) — or say "plan it now".`
 
-If he says **"place it now"**, run the **coordinator** skill's daily run (section A) and show its digest here. He approves it in this chat.
+If he says **"plan it now"** or "place it now", run the **plan** skill here. He books it in this chat.
 
 ### Several items in one message
 He might write "gym Tue 1h, GMAT 2h, call Sophie 30m". Work out each item, then ask for any missing durations in one question. Show one numbered confirmation:
@@ -112,7 +114,7 @@ Waiting to be placed (2)
 · GMAT prep · 2h · by Sun 4 Oct
 · PRNTCODE: supplier call · 1h · by Wed
 
-Proposed (1) — reply to the digest to approve
+Proposed (1) — left over from the old digest; the next plan covers it
 · Dentist · Sat 3 Oct 11:00–12:00
 
 Scheduled this week (1)
@@ -148,6 +150,8 @@ Reminders (1)
 
 ## 4. Recurring items (every week, or every N weeks)
 
+> **v2:** new recurring items are **activities**: use the **routine** skill to add them, so each gets a type (coached, protected, flexible, nudge or held). The functions below still work, and they're what the routine skill uses for a **held** item (a fixed weekly time). "What repeats?" can still list them, and "skip the Dubai drive this week" is now simply "skip the drive" in the planning chat.
+
 ### Create: "every week I need…" / "every other week…" / "every 3 weeks…"
 Work out the template:
 
@@ -172,7 +176,7 @@ select id, starts_on, interval_weeks from public.intake_add_recurring('<personal
   <start_dow>::smallint, '<HH:MM>', <end_dow>::smallint, '<HH:MM>', '<flexibility>', <priority>::smallint,
   '<starts_on YYYY-MM-DD>'::date, <'context' or null>, <interval_weeks>::smallint);
 ```
-Reply: `Set up. Each copy appears in the 07:00 digest, marked (weekly) or (every 2 weeks).`
+Reply: `Set up. It shows in your next plan.`
 
 The daily run posts this week's and next week's copies automatically, **only in the weeks the item happens in**, and never twice.
 
@@ -221,7 +225,7 @@ Show one line each, with the interval, e.g. `· Drive back to Dubai · weekly ·
    select status, duration_min, priority, due_by from public.intake_update('<id>', p_duration_min => 180);
    ```
    The other named parameters are `p_title`, `p_earliest_start`, `p_due_by`, `p_flexibility`, `p_priority` (as `::smallint`) and `p_source_agent`.
-4. Reply: `Updated.`, or `Updated — it'll be re-placed at 07:00 (or say "place it now").`
+4. Reply: `Updated.`, or `Updated — it'll be re-placed in your next plan (or say "plan it now").`
 
 ---
 

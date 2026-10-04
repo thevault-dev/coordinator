@@ -1,8 +1,10 @@
 {
   "name": "coordinator",
   "displayName": "Coordinator",
-  "version": "1.4.1",
-  "description": "Owns Khaled's calendar. Reads time requests from the Supabase ledger, proposes slots against his rules and three calendars, sends a short numbered digest, and books only what he approves on the Coordinator calendar. Khaled can add, edit, repeat (every N weeks), list and withdraw requests, and set Todoist reminders, from chat (intake). Needs the Google Calendar, Supabase and Todoist connectors.",
-  "author": { "name": "Khaled" },
+  "version": "2.0.0",
+  "description": "Owns Khaled's calendar. Twice a week (Sun and Wed evening, handed over by the PRNTCODE refresh with \"plan Khaled's half-week\") it plans the coming half-week as blocks of time: fixed bookings, held items, coach-booking nudges, protected study, flexible training and PRNTCODE focus blocks sized from the ledger. It books only on \"book it\", and only on the Coordinator calendar. Keeps an activities registry (routine), one-off requests and Todoist reminders (intake). Needs the Google Calendar, Supabase and Todoist connectors.",
+  "author": {
+    "name": "Khaled"
+  },
   "license": "UNLICENSED"
 }

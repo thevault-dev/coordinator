@@ -133,6 +133,121 @@ begin
   end if;
   raise notice 'PASS 9: agent_* functions are service_role only';
 
+  -- 10. v2 activities: types, add-from-chat, duplicate refusal, nudge timing, last_done
+  declare
+    a public.recurring; b public.plan_blocks; p public.plans; q1 public.requests; q2 public.requests;
+    mon date := public.recurring_week_monday() + 14;   -- a Monday two weeks out
+  begin
+    a := public.intake_add_activity('dod piano', 'coached', 60, 1::smallint, 'any evening', 1::smallint, 'Piano teacher');
+    if a.activity_type <> 'coached' or a.booked_with <> 'Piano teacher' or a.sessions_per_week <> 1 then
+      raise exception 'FAIL 10: coached activity not added as asked';
+    end if;
+    begin perform public.intake_add_activity('DOD Piano', 'coached', 60, 1::smallint); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 10: duplicate activity accepted'; end if;
+    begin perform public.intake_add_activity('dod swim2', 'flexible', 60); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 10: flexible activity without sessions accepted'; end if;
+    begin update public.recurring set activity_type = 'banana' where id = a.id; e := 'ok';
+    exception when check_violation then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 10: activity_type banana accepted'; end if;
+
+    a := public.intake_add_activity('dod barber', 'nudge', 30, null, null, 2::smallint);
+    if a.sessions_per_week is not null or public.activity_next_due(a) <> a.anchor_week then
+      raise exception 'FAIL 10: new nudge not due at its anchor';
+    end if;
+    a := public.activity_mark_done(a.id, '2026-10-04');
+    if a.last_done <> '2026-10-04' or public.activity_next_due(a) <> '2026-10-18' then
+      raise exception 'FAIL 10: nudge not re-timed from last_done';
+    end if;
+    a := public.activity_mark_done(a.id, '2026-10-01');
+    if a.last_done <> '2026-10-04' then raise exception 'FAIL 10: last_done moved backwards'; end if;
+    raise notice 'PASS 10: activities add, refuse duplicates/bad types, nudges time from last_done';
+
+    -- 11. plan blocks: hard rule, overlaps, focus block covers several requests, unbook, housekeeping
+    if not public.in_work_hours((mon + time '10:00') at time zone 'Asia/Dubai', (mon + time '11:00') at time zone 'Asia/Dubai')
+       or public.in_work_hours((mon + time '07:30') at time zone 'Asia/Dubai', (mon + time '08:30') at time zone 'Asia/Dubai')
+       or public.in_work_hours((mon + 4 + time '10:00') at time zone 'Asia/Dubai', (mon + 4 + time '11:00') at time zone 'Asia/Dubai') then
+      raise exception 'FAIL 11: in_work_hours wrong (Mon 10:00 / Mon 07:30 / Fri 10:00)';
+    end if;
+    insert into public.plans (half_week_start, half_week_end) values (mon, mon + 2) returning * into p;
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod gym',
+        (mon + time '10:00') at time zone 'Asia/Dubai', (mon + time '11:00') at time zone 'Asia/Dubai', 'evt_dod_w', a.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 11: block in fund hours accepted'; end if;
+
+    insert into public.requests (source_agent, sub_agent, source_ref, title, duration_min, due_by)
+    values ('prntcode', 'chief_of_staff', 'dod-v2-a', 'dod focus a', 90, (mon + 3) at time zone 'Asia/Dubai') returning * into q1;
+    insert into public.requests (source_agent, sub_agent, source_ref, title, duration_min, due_by)
+    values ('prntcode', 'chief_of_staff', 'dod-v2-b', 'dod focus b', 60, (mon + 3) at time zone 'Asia/Dubai') returning * into q2;
+    b := public.coordinator_book_block(p.id, 'prntcode', 'PRNTCODE focus',
+        (mon + time '19:00') at time zone 'Asia/Dubai', (mon + time '21:00') at time zone 'Asia/Dubai', 'evt_dod_f', null,
+        array[q1.id, q2.id]);
+    select * into q1 from public.requests where id = q1.id;
+    if q1.status <> 'scheduled' or q1.calendar_event_id <> 'evt_dod_f' or q1.slot_start <> b.slot_start then
+      raise exception 'FAIL 11: covered request not scheduled into the focus block';
+    end if;
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod clash',
+        (mon + time '20:00') at time zone 'Asia/Dubai', (mon + time '21:00') at time zone 'Asia/Dubai', 'evt_dod_c', a.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 11: overlapping block accepted'; end if;
+    begin perform public.coordinator_book_block(p.id, 'prntcode', 'dod empty',
+        (mon + 1 + time '19:00') at time zone 'Asia/Dubai', (mon + 1 + time '20:00') at time zone 'Asia/Dubai', 'evt_dod_e'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 11: focus block with no requests accepted'; end if;
+    begin perform public.coordinator_unbook_block(b.id, 'wrong_event'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 11: unbook without the right event id accepted'; end if;
+    b := public.coordinator_unbook_block(b.id, 'evt_dod_f', 'dod');
+    select * into q1 from public.requests where id = q1.id;
+    if b.status <> 'removed' or q1.status <> 'new' or q1.slot_start is not null then
+      raise exception 'FAIL 11: unbook did not free the block and its requests';
+    end if;
+    -- a block that already ended becomes done and sets the activity's last_done
+    a := public.intake_add_activity('dod run2', 'flexible', 45, 1::smallint);
+    insert into public.plan_blocks (plan_id, kind, activity_id, title, slot_start, slot_end, calendar_event_id)
+    values (p.id, 'activity', a.id, 'dod past', now() - interval '2 days', now() - interval '2 days' + interval '45 minutes', 'evt_dod_p')
+    returning * into b;
+    perform public.coordinator_plan_housekeeping();
+    select * into a from public.recurring where id = a.id;
+    select * into b from public.plan_blocks where id = b.id;
+    if b.status <> 'done' or a.last_done <> ((now() - interval '2 days') at time zone 'Asia/Dubai')::date then
+      raise exception 'FAIL 11: housekeeping did not mark the past block done and move last_done';
+    end if;
+    raise notice 'PASS 11: plan blocks keep fund hours, refuse overlaps, cover several requests, unbook cleanly';
+
+    -- 12. resolve and release (v1.5 replies inside the planning chat)
+    q2 := public.coordinator_resolve(q2.id, 'not_needed', 'her visa came through');
+    if q2.status <> 'declined' or q2.resolution <> 'not_needed'
+       or q2.decision_note <> 'Not needed (Khaled): her visa came through' then
+      raise exception 'FAIL 12: resolve not_needed wrong: % %', q2.status, q2.decision_note;
+    end if;
+    q1 := public.coordinator_resolve(q1.id, 'done_elsewhere', null);
+    if q1.status <> 'done' or q1.decision_note <> 'Done elsewhere (Khaled): no reason given' then
+      raise exception 'FAIL 12: resolve done_elsewhere wrong';
+    end if;
+    begin perform public.coordinator_resolve(q1.id, 'not_needed'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 12: resolving a closed request accepted'; end if;
+    insert into public.requests (source_agent, source_ref, title, duration_min, status, slot_start, slot_end, decided_at)
+    values ('prntcode', 'dod-v2-rel', 'dod release', 30, 'proposed', now() + interval '3 days', now() + interval '3 days 30 minutes', now())
+    returning * into q1;
+    q1 := public.coordinator_release(q1.id);
+    if q1.status <> 'new' or q1.slot_start is not null then raise exception 'FAIL 12: release did not reset'; end if;
+    raise notice 'PASS 12: resolve keeps the reason after ": ", release resets old proposals';
+  end;
+
+  if exists (
+    select 1 from information_schema.routine_privileges
+     where routine_schema = 'public'
+       and routine_name in ('intake_add_activity', 'intake_update_activity', 'activity_mark_done',
+                            'coordinator_book_block', 'coordinator_unbook_block', 'coordinator_plan_housekeeping',
+                            'coordinator_resolve', 'coordinator_release')
+       and grantee in ('anon', 'authenticated', 'PUBLIC')) then
+    raise exception 'FAIL 13: a v2 function is executable beyond service_role';
+  end if;
+  raise notice 'PASS 13: v2 functions are service_role only';
+
   raise notice 'ALL LEDGER CHECKS PASSED';
 end;
 $$;
