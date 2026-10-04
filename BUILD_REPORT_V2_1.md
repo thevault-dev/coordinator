@@ -1,7 +1,7 @@
 # BUILD REPORT: Coordinator v2.1 — Human-Shaped Planning (2026-10-04)
 
 ## Status
-BUILT, live in the database and tested on rolled-back test data. Plugin **2.1.0** is on branch `claude/keen-goldberg-rdkpbi` with a PR open to `main`. claude.ai picks it up once the PR is merged. Khaled hasn't run the planning chat in claude.ai yet; that's the last check (open question 1).
+BUILT, **merged to `main`** ([PR #3](https://github.com/thevault-dev/coordinator/pull/3)), live in the database and tested on rolled-back test data. claude.ai syncs plugin **2.1.0** from `main`. Khaled hasn't run the planning chat in claude.ai yet; that's the last check (open question 1).
 
 ## Where it lives
 - `thevault-dev/coordinator`, plugin 2.1.0: `skills/plan/SKILL.md` (rewritten: opener, 3b places, H rules, R rule edits, V visual plan), `skills/plan/half-week.html` (timeline template), `skills/routine/SKILL.md` (places), README.
@@ -21,7 +21,7 @@ BUILT, live in the database and tested on rolled-back test data. Plugin **2.1.0*
 - ✅ **Artifact in place.** Same URL across propose (v1 publish) → adjust (db v1) → book it (db v2) → republish + db v3 (real plan). Both update paths work. At 390px wide there's no horizontal scroll and no JS errors, in light and dark.
 - ✅ **"Dinner at 20:00 from now on".** `coordinator_set_rule` replaces the rule (old row kept inactive) and refuses 20:30 unless the window moves (rolled back). The live rule is unchanged.
 - ✅ **Book it.** All 11 test blocks were accepted by the live functions, and the factory-visit request became `scheduled`. A squeezed GMAT was refused. Everything was rolled back, so no calendar events were written.
-- ✅ Plugin 2.1.0 validates · advisor 0 lints · README updated · this build left no test rows (places=0, plans unchanged). ⏳ Merge to `main`.
+- ✅ Plugin 2.1.0 validates and is merged to `main` · advisor 0 lints · README updated · this build left no test rows (places=0, plans unchanged).
 
 ## Deviations & decisions
 - **DROP/UPDATE/DELETE still hang in this environment.** The migration went in additive parts. The old `coordinator_book_block` is **renamed** `coordinator_book_block_v2_0` (it now just raises), not dropped. All tests ran inside blocks that always roll back.
@@ -31,7 +31,7 @@ BUILT, live in the database and tested on rolled-back test data. Plugin **2.1.0*
 - The artifact reads the shared doc `plan/current`; republishing `half-week.html` is the fallback. Test stages were labelled `[TEST]`.
 
 ## Open questions
-1. **Merge the PR** (if not merged yet), then run the Sunday prompt once in claude.ai.
+1. Check that claude.ai shows Coordinator 2.1.0 (re-sync the marketplace if not), then run the Sunday prompt once in claude.ai.
 2. Next Mon–Wed (12–14 Oct) fits only **1 of 3 GMAT** under these rules (Monday PRNTCODE calls 18:00–20:00). Options: allow GMAT Thu–Sun, a 75-min early-morning session, or make Mon dinner flexible.
 3. Do you go home from the fund first? Tell me the minutes, and evenings will start later.
 4. **Cleanup SQL (v2 leftovers; DELETE hangs here, so please run it):**
