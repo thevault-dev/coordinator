@@ -9,6 +9,31 @@ The agents never talk to each other directly. Everything goes through this ledge
 
 ---
 
+## v2.1: human-shaped planning (4 Oct 2026)
+
+The plan now fits a real person in real places. What changed in the planning chat:
+
+1. **Commitments first.** Before proposing anything it shows what it already sees and asks: *"Before I plan Mon–Wed: any commitments I should account for? Dinners, events, calls, deadlines, travel, anything booked with coaches. And where will you be each day?"* It waits for your answer ("nothing" is fine). This replaces "Anything else booked?".
+2. **Places and travel.** Every activity has a default place (PT gym, tennis club…), and so does every commitment. The first time a place is unknown it asks once ("Where's tennis?") and remembers it. Travel between two places is blocked before and after; if the time between them isn't known yet, it asks you once for an estimate and stores it. No maps. Your base each day (Abu Dhabi weekdays, Dubai after the Thursday drive) comes from your answer.
+3. **Human time.** These rules are always respected and editable from chat (e.g. "dinner at 20:00 from now on"; it confirms first):
+
+   | Rule | Now |
+   |---|---|
+   | Focus blocks (PRNTCODE, GMAT) | at most **90 min**, 15 min break between. **GMAT is 3 × 90 min** (was 2 × 2h) |
+   | Breakfast | 30 min straight after morning PT |
+   | Dinner | 1h, protected, inside **19:30–21:00** (moves within the window) |
+   | Buffers | 15 min between back-to-back items, on top of travel |
+   | Weekday evenings | at most 2 focus blocks; evenings start 18:15 |
+   | Wind-down | weeknights (Sun–Thu): nothing ends after **22:00** (now hard) |
+
+   When demand doesn't fit, it says so with options (`Doesn't fit · GMAT 3rd session: a) Thu 18:15 · b) Sat 10:00 · c) skip`). It never squeezes the rules.
+4. **A visual half-week.** The plan is the artifact **[Khaled's half-week](https://claude.ai/artifact/SfbR2SsyNiu7rks2KDdNLE)**: one column per day, blocks coloured by type, fund hours as a grey band, travel and buffers muted, and coach slots you still have to book drawn **dashed**. It's the same link every time, updated when the plan is proposed, after each change and after "book it". Chat shows a one-line summary plus the card, not a text grid.
+5. **"book it"** now also books meals and travel on the Coordinator calendar (buffers stay as gaps).
+
+**Ledger additions** (migration `20261004200000_human_shaped_planning_v2_1`): `places`, `travel_minutes` (one symmetric row per pair), `recurring.place_id`, `plan_blocks.place_id`, block kinds `meal` and `travel`, and keyed rules (`rules.key`, `rules.params`) edited through `coordinator_set_rule`. `coordinator_book_block` gained `p_place_id` and enforces the focus, evening and wind-down rules itself; the v2.0 version is renamed `coordinator_book_block_v2_0` and retired. New functions: `place_add`, `place_retire`, `activity_set_place`, `travel_set`, `travel_between`, `coordinator_rule_params`, `coordinator_set_rule`, `plan_block_is_focus`. All are service_role only. The self-test (`supabase/tests/definition_of_done.sql`) adds checks 14–16.
+
+---
+
 ## v2: twice-weekly planning (4 Oct 2026)
 
 The daily digest is retired. Twice a week, on **Sunday and Wednesday at 20:00**, the PRNTCODE refresh runs first and then hands over **in the same chat** with this line:
@@ -19,7 +44,7 @@ plan Khaled's half-week
 
 That line (or `/coordinator:plan`, or "plan my week") starts the **plan** skill. It works out the half-week by itself: run on Sun or Mon, it plans **Mon–Wed**; run on Wed or Thu, it plans **Thu–Sun**. Then:
 
-1. **"Anything else booked?"** It shows what it already sees (calendar events and blocks booked earlier) and waits. What you name, such as "tennis Tue 19:00" or "dinner Wed 20:00", becomes **fixed**.
+1. **"Anything else booked?"** (v2.1: replaced by the commitments-and-location question above.) It shows what it already sees (calendar events and blocks booked earlier) and waits. What you name, such as "tennis Tue 19:00" or "dinner Wed 20:00", becomes **fixed**.
 2. **One overview on one phone screen**, grouped by day. It's built in this order: fixed → held → coached → protected → flexible → (Wednesdays) social & rest → **PRNTCODE focus blocks** → nudges.
    ```
    Plan · Mon 12 – Wed 14 Oct
@@ -46,7 +71,7 @@ On Sundays, the overview opens with `Last week: GMAT 2/2 · PT 3/3 · tennis 1/2
 | Type | Meaning | Today |
 |---|---|---|
 | coached | You book it with someone; the Coordinator only nudges | PT 3 × 1h Mon–Wed before work (done by 08:30) · Tennis 2 × 1h evenings |
-| protected | Placed early, hard to bump | GMAT 2 × 2h, Mon–Wed |
+| protected | Placed early, hard to bump | GMAT 3 × 90 min, Mon–Wed evenings (v2.1) |
 | flexible | Fits around everything | Swim 1 × 1h · Run 1 × 45m |
 | nudge | An action, timed from `last_done` | Haircut every 2 weeks |
 | held | Time held by default; you confirm it | Drive back to Dubai, Thu 18:00 |

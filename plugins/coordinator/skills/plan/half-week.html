@@ -1,0 +1,305 @@
+<title>Khaled's half-week</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a timetable. One column per day, time runs down; fund hours collapse to a thin grey band when every day is at the fund. */
+:root {
+  --bg: #f5f6f3;
+  --surface: #ffffff;
+  --fg: #1c2320;
+  --muted: #66706b;
+  --line: #dde1dc;
+  --fund: #e4e7e2;
+  --fund-ink: #8a938e;
+  --warn-bg: #fff3e0;
+  --warn-ink: #8a4a00;
+  --c-fixed: #34495e;   --t-fixed: #ffffff;
+  --c-held: #5f7385;    --t-held: #ffffff;
+  --c-coached: #0e7a71; --t-coached: #ffffff;
+  --c-protected: #4b44a8; --t-protected: #ffffff;
+  --c-flexible: #3c8a3a; --t-flexible: #ffffff;
+  --c-prntcode: #c25e0c; --t-prntcode: #ffffff;
+  --c-meal: #ecd27a;    --t-meal: #4a3b00;
+  --c-travel: #cfd4d0;  --t-travel: #525a56;
+  --c-buffer: #e3e6e2;  --t-buffer: #6b736f;
+  --f-ui: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2220; --fg: #e8ece9; --muted: #9aa49f; --line: #2c3431;
+    --fund: #222a27; --fund-ink: #75807b; --warn-bg: #3a2a12; --warn-ink: #ffcf8a;
+    --c-fixed: #6f8aa5; --t-fixed: #0f1418;
+    --c-held: #8fa2b4; --t-held: #0f1418;
+    --c-coached: #3fb8ac; --t-coached: #06201d;
+    --c-protected: #8f88e8; --t-protected: #141038;
+    --c-flexible: #79c776; --t-flexible: #0c230b;
+    --c-prntcode: #f2994a; --t-prntcode: #2a1400;
+    --c-meal: #d9bd5c; --t-meal: #2a2100;
+    --c-travel: #3b4441; --t-travel: #b8c1bc;
+    --c-buffer: #2a312e; --t-buffer: #8d9792;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2220; --fg: #e8ece9; --muted: #9aa49f; --line: #2c3431;
+  --fund: #222a27; --fund-ink: #75807b; --warn-bg: #3a2a12; --warn-ink: #ffcf8a;
+  --c-fixed: #6f8aa5; --t-fixed: #0f1418;
+  --c-held: #8fa2b4; --t-held: #0f1418;
+  --c-coached: #3fb8ac; --t-coached: #06201d;
+  --c-protected: #8f88e8; --t-protected: #141038;
+  --c-flexible: #79c776; --t-flexible: #0c230b;
+  --c-prntcode: #f2994a; --t-prntcode: #2a1400;
+  --c-meal: #d9bd5c; --t-meal: #2a2100;
+  --c-travel: #3b4441; --t-travel: #b8c1bc;
+  --c-buffer: #2a312e; --t-buffer: #8d9792;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-ui); font-size: 15px; line-height: 1.4; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 40px; display: grid; gap: 14px; }
+header { display: grid; gap: 4px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { margin: 0; font-size: 26px; line-height: 1.15; font-weight: 700; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pill.booked i { background: var(--c-flexible); }
+.pill.proposed i, .pill.adjusted i { background: var(--c-prntcode); }
+.summary { font-size: 15px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.dash { background: transparent !important; border: 1.5px dashed var(--c-coached); }
+
+.grid { display: grid; grid-template-columns: 34px repeat(var(--days), minmax(0, 1fr)); gap: 0 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 6px 10px 4px; }
+.dayhead { text-align: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); min-width: 0; }
+.dayhead b { display: block; font-size: 14px; }
+.dayhead small { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axis, .col { position: relative; }
+.axis span { position: absolute; right: 4px; transform: translateY(-50%); font-family: var(--f-mono); font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col { border-left: 1px solid var(--line); min-width: 0; }
+.hr { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
+.fund { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(135deg, var(--fund) 0 6px, transparent 6px 9px), var(--fund); border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+.fund em { font-style: normal; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--fund-ink); font-weight: 600; background: var(--fund); padding: 0 4px; border-radius: 3px; }
+.blk { position: absolute; left: 2px; right: 2px; border-radius: 5px; padding: 2px 4px; overflow: hidden; cursor: pointer; border: 0; text-align: left; font: inherit; color: inherit; display: block; }
+.blk:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; z-index: 3; }
+.blk .t { display: block; font-size: 12px; font-weight: 600; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk .s { display: block; font-family: var(--f-mono); font-size: 10px; line-height: 1.2; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk .n { font-family: var(--f-mono); font-weight: 500; opacity: .8; margin-right: 3px; }
+.blk.sel { box-shadow: 0 0 0 2px var(--fg); z-index: 2; }
+.ty-fixed { background: var(--c-fixed); color: var(--t-fixed); }
+.ty-held { background: var(--c-held); color: var(--t-held); }
+.ty-coached { background: var(--c-coached); color: var(--t-coached); }
+.ty-coached.unbooked { background: color-mix(in srgb, var(--c-coached) 14%, var(--surface)); color: var(--fg); border: 1.5px dashed var(--c-coached); }
+.ty-protected { background: var(--c-protected); color: var(--t-protected); }
+.ty-flexible { background: var(--c-flexible); color: var(--t-flexible); }
+.ty-prntcode { background: var(--c-prntcode); color: var(--t-prntcode); }
+.ty-meal { background: var(--c-meal); color: var(--t-meal); }
+.ty-travel { background: repeating-linear-gradient(90deg, var(--c-travel) 0 5px, color-mix(in srgb, var(--c-travel) 70%, var(--surface)) 5px 8px); color: var(--t-travel); }
+.ty-buffer { background: var(--c-buffer); color: var(--t-buffer); cursor: default; }
+.blk.thin .t, .blk.thin .s { display: none; }
+.blk.short .s { display: none; }
+.blk.short { padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
+
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 52px; font-size: 14px; }
+.detail .k { color: var(--muted); font-size: 12px; }
+.detail b { font-size: 15px; }
+.notes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.notes li { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.notes li.nofit { background: var(--warn-bg); color: var(--warn-ink); border-color: transparent; }
+.notes li .lab { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; opacity: .8; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.agenda { display: grid; gap: 10px; margin-top: 8px; }
+.agenda h3 { margin: 0 0 2px; font-size: 14px; }
+.agenda ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 13px; }
+.agenda li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
+.agenda .tm { font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: 14px; padding: 24px 8px; text-align: center; }
+footer { color: var(--muted); font-size: 12px; }
+@media (max-width: 480px) {
+  h1 { font-size: 22px; }
+  .grid { grid-template-columns: 28px repeat(var(--days), minmax(0, 1fr)); gap: 0 2px; padding-inline: 2px; }
+  .blk { left: 1px; right: 1px; padding-inline: 3px; }
+  .blk .t { font-size: 11px; }
+}
+@media (prefers-reduced-motion: no-preference) { .blk { transition: box-shadow .12s ease; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Khaled's half-week</div>
+    <h1 id="range">Your half-week plan</h1>
+    <div class="meta"><span class="pill" id="stage"><i></i><span>Waiting for a plan</span></span><span id="updated"></span></div>
+    <div class="summary" id="summary"></div>
+  </header>
+  <div class="legend" id="legend"></div>
+  <div id="timeline"></div>
+  <div class="detail" id="detail" aria-live="polite"><span class="k">Tap a block to see its details.</span></div>
+  <ul class="notes" id="notes"></ul>
+  <details id="listview"><summary>List view</summary><div class="agenda" id="agenda"></div></details>
+  <footer id="foot">Abu Dhabi time. Updated by the Coordinator when a plan is proposed, adjusted and booked.</footer>
+</div>
+
+<script type="application/json" id="plan-data">
+{"version": 1, "updated_at": null, "days": []}
+</script>
+
+<script>
+(function () {
+  var TYPES = [
+    ["fixed", "Fixed"], ["held", "Held"], ["coached", "Coached"], ["protected", "Protected"],
+    ["flexible", "Flexible"], ["prntcode", "PRNTCODE"], ["meal", "Meal"], ["travel", "Travel"], ["buffer", "Buffer"]
+  ];
+  var TYPE_LABEL = {}; TYPES.forEach(function (t) { TYPE_LABEL[t[0]] = t[1]; });
+  var HOUR_PX = 46, SQUASH_PX = 4;
+  var current = null, selected = null;
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function mins(hhmm) { var p = String(hhmm || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
+  function fmtMin(m) { var h = Math.floor(m / 60), mm = m % 60; return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm; }
+  function dur(b) { var d = mins(b.end) - mins(b.start); if (d <= 0) d += 1440; return d; }
+  function durLabel(d) { return d >= 60 ? (Math.floor(d / 60) + "h" + (d % 60 ? " " + (d % 60) + "m" : "")) : d + "m"; }
+
+  function legend() {
+    var box = document.getElementById("legend"); box.textContent = "";
+    TYPES.forEach(function (t) {
+      var s = el("span"); var sw = el("i", "sw ty-" + t[0]); s.appendChild(sw); s.appendChild(document.createTextNode(t[1])); box.appendChild(s);
+    });
+    var s = el("span"); s.appendChild(el("i", "sw dash")); s.appendChild(document.createTextNode("Coach not booked yet")); box.appendChild(s);
+    var f = el("span"); var fs = el("i", "sw"); fs.style.background = "var(--fund)"; f.appendChild(fs); f.appendChild(document.createTextNode("Fund hours")); box.appendChild(f);
+  }
+
+  // Piecewise time scale: hours that are fund hours on every day and hold no block collapse.
+  function buildScale(days) {
+    var lo = 6 * 60, hi = 23 * 60;
+    days.forEach(function (d) { (d.blocks || []).forEach(function (b) {
+      lo = Math.min(lo, Math.floor(mins(b.start) / 60) * 60);
+      var e = mins(b.end); if (e < mins(b.start)) e = 24 * 60; hi = Math.max(hi, Math.ceil(e / 60) * 60);
+    }); });
+    var allFund = days.length > 0 && days.every(function (d) { return d.fund; });
+    var squash = {};
+    if (allFund) {
+      for (var h = 9; h < 18; h++) {
+        var used = days.some(function (d) { return (d.blocks || []).some(function (b) {
+          var s = mins(b.start), e = mins(b.end); return s < (h + 1) * 60 && e > h * 60;
+        }); });
+        if (!used) squash[h] = true;
+      }
+    }
+    var stops = [], y = 0;
+    for (var hh = lo / 60; hh < hi / 60; hh++) { stops.push({ h: hh, y: y, px: squash[hh] ? SQUASH_PX : HOUR_PX }); y += squash[hh] ? SQUASH_PX : HOUR_PX; }
+    function yOf(m) {
+      if (m <= lo) return 0;
+      for (var i = 0; i < stops.length; i++) { var s = stops[i]; if (m < (s.h + 1) * 60) return s.y + (m - s.h * 60) / 60 * s.px; }
+      return y;
+    }
+    return { lo: lo, hi: hi, height: y, y: yOf, stops: stops, squash: squash };
+  }
+
+  function select(b, day, node) {
+    selected = node;
+    Array.prototype.forEach.call(document.querySelectorAll(".blk.sel"), function (n) { n.classList.remove("sel"); });
+    if (node) node.classList.add("sel");
+    var box = document.getElementById("detail"); box.textContent = "";
+    var top = el("div"); top.appendChild(el("b", null, (b.n ? b.n + " · " : "") + b.title)); box.appendChild(top);
+    var kind = TYPE_LABEL[b.type] || b.type;
+    if (b.type === "coached") kind += b.booked ? " · booked" : " · not booked yet, ideal slot";
+    var line = el("div", "k", day.label + " " + b.start + "–" + b.end + " · " + durLabel(dur(b)) + " · " + kind + (b.place ? " · " + b.place : ""));
+    box.appendChild(line);
+    if (b.detail) box.appendChild(el("div", null, b.detail));
+  }
+
+  function render(plan) {
+    current = plan;
+    var days = plan.days || [];
+    document.getElementById("range").textContent = plan.range || "Your half-week plan";
+    var st = document.getElementById("stage"); st.className = "pill " + (plan.stage || "");
+    st.querySelector("span").textContent = plan.stage === "booked" ? "Booked on your calendar" : plan.stage === "adjusted" ? "Adjusted · not booked yet" : plan.stage === "proposed" ? "Proposed · not booked yet" : "Waiting for a plan";
+    var up = document.getElementById("updated");
+    up.textContent = plan.updated_at ? "Updated " + new Date(plan.updated_at).toLocaleString("en-GB", { timeZone: "Asia/Dubai", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+    document.getElementById("summary").textContent = plan.summary || "";
+
+    var tl = document.getElementById("timeline"); tl.textContent = "";
+    if (!days.length) { tl.appendChild(el("div", "empty", "No plan yet. The Coordinator fills this in when it proposes your next half-week.")); }
+    else {
+      var sc = buildScale(days);
+      var g = el("div", "grid"); g.style.setProperty("--days", days.length);
+      g.appendChild(el("div"));
+      days.forEach(function (d) { var h = el("div", "dayhead"); h.appendChild(el("b", null, d.label)); h.appendChild(el("small", null, d.base || " ")); g.appendChild(h); });
+      var axis = el("div", "axis"); axis.style.height = sc.height + "px"; g.appendChild(axis);
+      sc.stops.forEach(function (s) { if (!sc.squash[s.h] || s.h === 9) { var t = el("span", null, (s.h < 10 ? "0" : "") + s.h); t.style.top = s.y + "px"; axis.appendChild(t); } });
+      days.forEach(function (d) {
+        var col = el("div", "col"); col.style.height = sc.height + "px";
+        sc.stops.forEach(function (s) { if (!sc.squash[s.h]) { var l = el("div", "hr"); l.style.top = s.y + "px"; col.appendChild(l); } });
+        if (d.fund) {
+          var f = el("div", "fund"); var y0 = sc.y(540), y1 = sc.y(1080);
+          f.style.top = y0 + "px"; f.style.height = Math.max(y1 - y0, 4) + "px";
+          if (y1 - y0 >= 14) f.appendChild(el("em", null, "Fund")); col.appendChild(f);
+        }
+        (d.blocks || []).forEach(function (b) {
+          var s = mins(b.start), e = mins(b.end); if (e <= s) e = sc.hi;
+          var top = sc.y(s), h = Math.max(sc.y(e) - top, 3);
+          var node = el(b.type === "buffer" ? "div" : "button", "blk ty-" + b.type + (b.type === "coached" && !b.booked ? " unbooked" : ""));
+          if (node.tagName === "BUTTON") node.type = "button";
+          node.style.top = top + "px"; node.style.height = (h - 1) + "px";
+          if (h < 15) node.classList.add("thin"); else if (h < 30) node.classList.add("short");
+          var t = el("span", "t");
+          if (b.n) t.appendChild(el("span", "n", String(b.n)));
+          t.appendChild(document.createTextNode(b.type === "travel" ? (b.title || "Travel") + " " + durLabel(dur(b)) : b.title));
+          node.appendChild(t);
+          node.appendChild(el("span", "s", b.start + "–" + b.end + (b.place ? " · " + b.place : "")));
+          node.setAttribute("aria-label", d.label + " " + b.start + " to " + b.end + ", " + b.title + ", " + (TYPE_LABEL[b.type] || b.type) + (b.type === "coached" && !b.booked ? ", not booked yet" : ""));
+          if (b.type !== "buffer") node.addEventListener("click", function () { select(b, d, node); });
+          col.appendChild(node);
+        });
+        g.appendChild(col);
+      });
+      tl.appendChild(g);
+    }
+
+    var notes = document.getElementById("notes"); notes.textContent = "";
+    (plan.notes || []).forEach(function (n) {
+      var li = el("li", n.kind || "info");
+      var lab = n.kind === "nofit" ? "Doesn't fit" : n.kind === "nudge" ? "Nudge" : n.kind === "coach" ? "Book with your coach" : n.kind === "free" ? "Free" : null;
+      if (lab) li.appendChild(el("span", "lab", lab));
+      li.appendChild(document.createTextNode(n.text)); notes.appendChild(li);
+    });
+
+    var ag = document.getElementById("agenda"); ag.textContent = "";
+    days.forEach(function (d) {
+      var sec = el("section"); sec.appendChild(el("h3", null, d.label + (d.base ? " · " + d.base : "")));
+      var ol = el("ol");
+      (d.blocks || []).filter(function (b) { return b.type !== "buffer"; }).forEach(function (b) {
+        var li = el("li"); li.appendChild(el("span", "tm", b.start + "–" + b.end));
+        li.appendChild(el("span", null, (b.n ? b.n + " · " : "") + b.title + (b.type === "coached" && !b.booked ? " (book it with your coach)" : "") + (b.place ? " · " + b.place : "")));
+        ol.appendChild(li);
+      });
+      sec.appendChild(ol); ag.appendChild(sec);
+    });
+    document.getElementById("detail").innerHTML = '<span class="k">Tap a block to see its details.</span>';
+  }
+
+  function newer(a, b) { if (!a || !a.updated_at) return b; if (!b || !b.updated_at) return a; return Date.parse(b.updated_at) > Date.parse(a.updated_at) ? b : a; }
+
+  legend();
+  var embedded = {};
+  try { embedded = JSON.parse(document.getElementById("plan-data").textContent) || {}; } catch (e) { embedded = {}; }
+  render(embedded);
+
+  // The plan skill writes the latest plan to the shared document plan/current.
+  if (window.claude && window.claude.use) {
+    window.claude.use("db").then(function (db) {
+      if (!db) return;
+      db.doc("plan/current").onSnapshot(function (snap) {
+        if (!snap.exists) return;
+        var data = snap.data() || {};
+        var pick = newer(current, data);
+        if (pick !== current) render(pick);
+      }, function () {});
+    }).catch(function () {});
+  }
+})();
+</script>

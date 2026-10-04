@@ -124,6 +124,7 @@ begin
   raise notice 'PASS 8: resolution checked, stamp is prntcode-only, idempotent and leaves updated_at alone';
 
   -- 9. Domain-agent functions are service_role only
+
   if exists (
     select 1 from information_schema.routine_privileges
      where routine_schema = 'public'
@@ -181,7 +182,7 @@ begin
     insert into public.requests (source_agent, sub_agent, source_ref, title, duration_min, due_by)
     values ('prntcode', 'chief_of_staff', 'dod-v2-b', 'dod focus b', 60, (mon + 3) at time zone 'Asia/Dubai') returning * into q2;
     b := public.coordinator_book_block(p.id, 'prntcode', 'PRNTCODE focus',
-        (mon + time '19:00') at time zone 'Asia/Dubai', (mon + time '21:00') at time zone 'Asia/Dubai', 'evt_dod_f', null,
+        (mon + time '19:00') at time zone 'Asia/Dubai', (mon + time '20:30') at time zone 'Asia/Dubai', 'evt_dod_f', null,
         array[q1.id, q2.id]);
     select * into q1 from public.requests where id = q1.id;
     if q1.status <> 'scheduled' or q1.calendar_event_id <> 'evt_dod_f' or q1.slot_start <> b.slot_start then
@@ -237,16 +238,115 @@ begin
     raise notice 'PASS 12: resolve keeps the reason after ": ", release resets old proposals';
   end;
 
+  -- 14-16. v2.1 human-shaped planning: places, travel, rules, focus limits
+  declare
+    pl1 public.places; pl2 public.places; tr public.travel_minutes; ru public.rules;
+    a public.recurring; b public.plan_blocks; p public.plans; g public.recurring;
+    mon date := public.recurring_week_monday() + 21;   -- a Monday three weeks out
+  begin
+    -- 14. places and travel
+    pl1 := public.place_add('dod tennis club', 'Saadiyat, Abu Dhabi');
+    pl2 := public.place_add('dod home AD', 'Abu Dhabi');
+    begin perform public.place_add('DOD Tennis Club'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 14: duplicate place accepted'; end if;
+    a := public.intake_add_activity('dod tennis2', 'coached', 60, 1::smallint);
+    a := public.activity_set_place(a.id, pl1.id);
+    if a.place_id <> pl1.id then raise exception 'FAIL 14: activity place not stored'; end if;
+    if public.travel_between(pl1.id, pl2.id) is not null then raise exception 'FAIL 14: unknown travel not null'; end if;
+    tr := public.travel_set(pl2.id, pl1.id, 25);
+    if public.travel_between(pl1.id, pl2.id) <> 25 or public.travel_between(pl2.id, pl1.id) <> 25
+       or public.travel_between(pl1.id, pl1.id) <> 0 then
+      raise exception 'FAIL 14: travel is not symmetric or same-place is not 0';
+    end if;
+    tr := public.travel_set(pl1.id, pl2.id, 30);
+    if public.travel_between(pl2.id, pl1.id) <> 30 or (select count(*) from public.travel_minutes
+        where place_a = least(pl1.id, pl2.id) and place_b = greatest(pl1.id, pl2.id)) <> 1 then
+      raise exception 'FAIL 14: re-estimate did not replace the single pair row';
+    end if;
+    raise notice 'PASS 14: places are unique, activities keep a default place, travel is one symmetric row per pair';
+
+    -- 15. editable rules ("dinner at 20:00 from now on")
+    ru := public.coordinator_set_rule('meal_dinner',
+      'Dinner is protected for 1 hour at 20:00 (window 19:30-21:00).', 'hard',
+      '{"duration_min": 60, "window_start": "19:30", "window_end": "21:00", "fixed_start": "20:00"}');
+    if (select count(*) from public.rules where key = 'meal_dinner' and active) <> 1
+       or public.coordinator_rule_params('meal_dinner')->>'fixed_start' <> '20:00' then
+      raise exception 'FAIL 15: dinner rule not replaced cleanly';
+    end if;
+    if not exists (select 1 from public.rules where key = 'meal_dinner' and not active) then
+      raise exception 'FAIL 15: old dinner rule not kept as history';
+    end if;
+    begin perform public.coordinator_set_rule('meal_dinner', 'x', 'hard',
+      '{"duration_min": 60, "window_start": "19:30", "window_end": "21:00", "fixed_start": "20:30"}'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 15: dinner outside its window accepted'; end if;
+    raise notice 'PASS 15: rules are edited by key, history kept, a dinner outside its window is refused';
+
+    -- 16. coordinator_book_block enforces the human-time rules
+    insert into public.plans (half_week_start, half_week_end, summary) values (mon, mon + 2, 'dod v2.1') returning * into p;
+    g := public.intake_add_activity('dod study', 'protected', 90, 3::smallint);
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod study 2h',
+        (mon + time '18:30') at time zone 'Asia/Dubai', (mon + time '20:30') at time zone 'Asia/Dubai', 'evt_dod21_x', g.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 16: 2h focus block accepted'; end if;
+    b := public.coordinator_book_block(p.id, 'activity', 'dod study',
+        (mon + time '18:30') at time zone 'Asia/Dubai', (mon + time '20:00') at time zone 'Asia/Dubai', 'evt_dod21_1', g.id,
+        '{}', null, pl2.id);
+    if b.place_id <> pl2.id then raise exception 'FAIL 16: block place not stored'; end if;
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod study back-to-back',
+        (mon + time '20:00') at time zone 'Asia/Dubai', (mon + time '21:30') at time zone 'Asia/Dubai', 'evt_dod21_x', g.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 16: focus block with no break accepted'; end if;
+    b := public.coordinator_book_block(p.id, 'meal', 'Dinner',
+        (mon + time '20:00') at time zone 'Asia/Dubai', (mon + time '20:15') at time zone 'Asia/Dubai', 'evt_dod21_m');
+    b := public.coordinator_book_block(p.id, 'activity', 'dod study 2',
+        (mon + time '20:15') at time zone 'Asia/Dubai', (mon + time '21:45') at time zone 'Asia/Dubai', 'evt_dod21_2', g.id);
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod study 3',
+        (mon + 1 + time '05:00') at time zone 'Asia/Dubai', (mon + 1 + time '06:00') at time zone 'Asia/Dubai', 'evt_dod21_x', g.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'ok' then raise exception 'FAIL 16: a morning focus block was refused by the evening limit'; end if;
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod study 3',
+        (mon + time '06:00') at time zone 'Asia/Dubai', (mon + time '07:00') at time zone 'Asia/Dubai', 'evt_dod21_y', g.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'ok' then raise exception 'FAIL 16: morning focus block refused'; end if;
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod run late',
+        (mon + 2 + time '21:15') at time zone 'Asia/Dubai', (mon + 2 + time '22:15') at time zone 'Asia/Dubai', 'evt_dod21_z', a.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 16: weeknight block ending 22:15 accepted'; end if;
+    b := public.coordinator_book_block(p.id, 'fixed', 'dod late dinner (Khaled fixed it)',
+        (mon + 2 + time '21:00') at time zone 'Asia/Dubai', (mon + 2 + time '23:00') at time zone 'Asia/Dubai', 'evt_dod21_f');
+    b := public.coordinator_book_block(p.id, 'travel', 'Travel home',
+        (mon + 2 + time '23:00') at time zone 'Asia/Dubai', (mon + 2 + time '23:30') at time zone 'Asia/Dubai', 'evt_dod21_t',
+        null, '{}', null, pl2.id);
+    -- third focus block on one weekday evening
+    b := public.coordinator_book_block(p.id, 'activity', 'dod eve 1',
+        (mon + 1 + time '18:30') at time zone 'Asia/Dubai', (mon + 1 + time '19:30') at time zone 'Asia/Dubai', 'evt_dod21_e1', g.id);
+    b := public.coordinator_book_block(p.id, 'activity', 'dod eve 2',
+        (mon + 1 + time '19:45') at time zone 'Asia/Dubai', (mon + 1 + time '20:15') at time zone 'Asia/Dubai', 'evt_dod21_e2', g.id);
+    begin perform public.coordinator_book_block(p.id, 'activity', 'dod eve 3',
+        (mon + 1 + time '20:30') at time zone 'Asia/Dubai', (mon + 1 + time '21:00') at time zone 'Asia/Dubai', 'evt_dod21_e3', g.id); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 16: third focus block on a weekday evening accepted'; end if;
+    begin perform public.coordinator_book_block_v2_0(p.id, 'fixed', 'old', now() + interval '30 days', now() + interval '30 days 1 hour', 'evt_old'); e := 'ok';
+    exception when others then e := 'refused'; end;
+    if e <> 'refused' then raise exception 'FAIL 16: retired v2.0 book_block still works'; end if;
+    raise notice 'PASS 16: focus <= 90 min with breaks, max 2 per weekday evening, wind-down 22:00, meals/travel/places';
+  end;
+
   if exists (
     select 1 from information_schema.routine_privileges
      where routine_schema = 'public'
        and routine_name in ('intake_add_activity', 'intake_update_activity', 'activity_mark_done',
                             'coordinator_book_block', 'coordinator_unbook_block', 'coordinator_plan_housekeeping',
-                            'coordinator_resolve', 'coordinator_release')
+                            'coordinator_resolve', 'coordinator_release',
+                            'place_add', 'place_retire', 'activity_set_place', 'travel_set', 'travel_between',
+                            'coordinator_rule_params', 'coordinator_set_rule', 'plan_block_is_focus',
+                            'coordinator_book_block_v2_0')
        and grantee in ('anon', 'authenticated', 'PUBLIC')) then
-    raise exception 'FAIL 13: a v2 function is executable beyond service_role';
+    raise exception 'FAIL 13: a v2/v2.1 function is executable beyond service_role';
   end if;
-  raise notice 'PASS 13: v2 functions are service_role only';
+  raise notice 'PASS 13: v2 and v2.1 functions are service_role only';
 
   raise notice 'ALL LEDGER CHECKS PASSED';
 end;

@@ -8,7 +8,7 @@
     {
       "name": "coordinator",
       "source": "./plugins/coordinator",
-      "description": "Plans each half-week (Sun and Wed evening) as blocks of time: activities by type, PRNTCODE focus blocks and booking nudges. Nothing is booked until Khaled says \"book it\"."
+      "description": "Plans each half-week (Sun and Wed evening) as blocks of time that fit real places and real days: commitments first, travel, meals, buffers and 90-minute focus blocks, shown as a visual timeline. Nothing is booked until Khaled says \"book it\"."
     }
   ]
 }
