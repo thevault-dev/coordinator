@@ -13,7 +13,7 @@ The routine is the list of things Khaled does every week or every few weeks. `/c
 - Supabase `execute_sql` on project `hgkreprqxevayruqpibf`. **One statement per call.**
 - Google Calendar, only for a late coached booking (section 4), and only on the **Coordinator** calendar (`4f0f7f079667e9b74eb5605d03065375d94f32de53fa7548afbb4d354b0f50da@group.calendar.google.com`, trimmed summary `Coordinator`), with `notificationLevel: "NONE"`.
 - Abu Dhabi time (`Asia/Dubai`, UTC+4). Store UTC.
-- Never `insert`/`update` `recurring` or `plan_blocks` directly. Use only: `intake_add_activity`, `intake_update_activity`, `intake_add_recurring` (held items), `intake_stop_recurring`, `activity_mark_done`, `coordinator_book_block`.
+- Never `insert`/`update` `recurring` or `plan_blocks` directly. Use only: `intake_add_activity`, `intake_update_activity`, `intake_add_recurring` (held items), `intake_stop_recurring`, `activity_mark_done`, `coordinator_book_block`, and for places (v2.1) `place_add`, `activity_set_place`, `travel_set`.
 
 ## The five types
 
@@ -67,18 +67,18 @@ Reply: `Added. It's in your next plan.`
 ## 2. "What's my routine?"
 
 ```sql
-select title, activity_type, sessions_per_week, duration_min, preferred_time, booked_with, interval_weeks, last_done, public.activity_next_due(r) as next_due, window_start_dow, window_start_time, window_end_dow, window_end_time from public.recurring r where active order by array_position(array['held','coached','protected','flexible','nudge'], activity_type), title;
+select r.title, r.activity_type, r.sessions_per_week, r.duration_min, r.preferred_time, r.booked_with, r.interval_weeks, r.last_done, public.activity_next_due(r) as next_due, r.window_start_dow, r.window_start_time, r.window_end_dow, r.window_end_time, p.name as place from public.recurring r left join public.places p on p.id = r.place_id where r.active order by array_position(array['held','coached','protected','flexible','nudge'], r.activity_type), r.title;
 ```
 One line each, grouped by type, on one phone screen:
 ```
 Held · Drive back to Dubai · Thu 18:00, 1.5h
 Coached · PT · 3 × 1h · Mon–Wed before work, done by 08:30 · PT coach
-Coached · Tennis · 2 × 1h · evenings · Tennis coach
-Protected · GMAT · 2 × 2h · Mon–Wed
+Coached · Tennis · 2 × 1h · evenings · Tennis coach · at Tennis club
+Protected · GMAT · 3 × 90m · Mon–Wed evenings
 Flexible · Swim · 1 × 1h  ·  Run · 1 × 45m
 Nudge · Haircut · every 2 weeks · next due Mon 5 Oct
 ```
-Add `· last done Sat 3 Oct` when `last_done` is set. Repeating Todoist reminders are listed by the intake skill ("what repeats?"), not here.
+Add `· at <place>` when it has a place and `· last done Sat 3 Oct` when `last_done` is set. Repeating Todoist reminders are listed by the intake skill ("what repeats?"), not here.
 
 ## 3. "Did my run", "done with GMAT", "booked the haircut"
 
@@ -96,10 +96,18 @@ This fills that week's coached gap, so the next plan nudges for one fewer.
 2. Confirm: `Tennis · Thu 8 Oct 19:00–20:00 (booked with coach) — add to your Coordinator calendar?`
 3. On yes: `create_event` on the Coordinator calendar (`[Personal] Tennis (booked with coach)`, Asia/Dubai, `notificationLevel: "NONE"`), then:
    ```sql
-   select id, title from public.coordinator_book_block(null, 'activity', 'Tennis (booked with coach)', '<start>Z', '<end>Z', '<event id>', '<activity id>', '{}', 'booked by Khaled');
+   select id, title from public.coordinator_book_block(null, 'activity', 'Tennis (booked with coach)', '<start>Z', '<end>Z', '<event id>', '<activity id>', '{}', 'booked by Khaled', <'place id' or null>);
    ```
-   It refuses fund hours and overlaps. If it fails, delete the event you just created and say why in one line.
+   Pass the activity's `place_id`. It refuses fund hours, overlaps and the human-time rules (e.g. ending after 22:00 on a weeknight). If the place differs from where he is before/after, the next plan or adjustment adds the travel. If it fails, delete the event you just created and say why in one line.
 4. Reply: `Added — tennis Thu 19:00. That's 2/2 this week.`
+
+## 4b. Places: "tennis is at the Saadiyat club"
+
+Activities have a default place so the plan can block travel (v2.1). The plan skill asks for unknown ones; he can also say it any time.
+1. Find the activity. Reuse a place that already exists (`select id, name, area from public.places where active;`, match loosely), otherwise his words are the yes: `select id, name from public.place_add('<name>', '<area or null>');`.
+2. `select title from public.activity_set_place('<activity id>', '<place id>');`
+3. "About 20 minutes from home": `select minutes from public.travel_set('<place id>', '<other place id>', 20);` (create the other place the same way, e.g. `Abu Dhabi base`).
+4. Reply: `Noted — tennis is at Saadiyat club, 20 min from home.`
 
 ## 5. Change or stop
 
