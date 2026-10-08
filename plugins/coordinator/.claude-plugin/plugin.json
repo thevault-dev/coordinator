@@ -1,8 +1,8 @@
 {
   "name": "coordinator",
   "displayName": "Coordinator",
-  "version": "2.1.0",
-  "description": "Owns Khaled's calendar. Twice a week (Sun and Wed evening, handed over by the PRNTCODE refresh with \"plan Khaled's half-week\") it asks about commitments and where he'll be, then plans the coming half-week as blocks of time that fit a real person: fixed bookings, travel between places, meals, buffers, 90-minute focus blocks, coach-booking nudges, protected study, flexible training and PRNTCODE focus blocks. Shows it as the visual \"Khaled's half-week\" artifact and books only on \"book it\", only on the Coordinator calendar. Keeps an activities registry with places (routine), one-off requests and Todoist reminders (intake). Needs the Google Calendar, Supabase and Todoist connectors.",
+  "version": "2.2.0",
+  "description": "Owns Khaled's calendar. Twice a week (Sun and Wed evening, handed over by the PRNTCODE refresh with \"plan Khaled's half-week\") it asks about commitments and where he'll be, then plans the coming half-week as blocks of time that fit a real person: fixed bookings, travel between places, meals, buffers, 90-minute focus blocks, coach-booking nudges, protected study, flexible training and PRNTCODE focus blocks. Shows it as the visual \"Khaled's half-week\" artifact and books only on \"book it\", only on the Coordinator calendar. Keeps an activities registry with places (routine), one-off requests, Todoist reminders and Khaled's Todoist lists and labels: groceries by section, shopping (in person / online), tasks, and things to carry between Abu Dhabi and Dubai (intake), with a carry nudge before each drive (plan). Needs the Google Calendar, Supabase and Todoist connectors.",
   "author": {
     "name": "Khaled"
   },

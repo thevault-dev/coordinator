@@ -9,6 +9,31 @@ The agents never talk to each other directly. Everything goes through this ledge
 
 ---
 
+## v2.2: Todoist lists and labels (8 Oct 2026)
+
+The Coordinator now files things into **your** Todoist the way you do, instead of dropping every reminder in the Inbox with no labels. Everything is confirmed in one line first, as before.
+
+| You type | What happens |
+|---|---|
+| `Add milk, apples and dish soap to groceries` · `we're out of rice` | `Groceries · Milk (Dairy) · Apples (Fruit and vegetables) · Dish soap (Household) — add?` One undated task per item in **Grocery List**, in the section that fits. If no section fits, it goes in the list with no section. Items already open on the list are skipped. |
+| `Buy linen trousers, need altering` · `buy a phone case, either way` | **Shopping**, undated. Fitting, altering or trying on → `@in person`; "order online" → `@online`; either → both. Unclear → `In person, online or both?` |
+| `Add 'renew Emirates ID' to my tasks` | **Personal Tasks** or **PRNTCODE Tasks** (the same personal/PRNTCODE call intake already makes), undated, no "When?". |
+| `Remind me at 5 to call Sophie` | Timed reminders now go to **Personal Tasks** or **PRNTCODE Tasks** too: `Reminder · PRNTCODE Tasks · Call Sophie · Thu 8 Oct 17:00 — set it?`. The **Inbox** is used only when you say so. |
+| `Take my racket to Dubai` · `bring the charger back to AD` | Adds `@bring to GC` (Dubai home, Green Community) or `@bring to apt` (Abu Dhabi apartment). Works on any task, grocery or shopping item, next to its other labels. Unclear → `To Dubai or to Abu Dhabi?` |
+| `What am I taking to Dubai?` · `what do I need to buy in person?` | Lists the labelled open items on one screen. |
+
+**Carry nudge (plan skill).** When a half-week plan includes the Dubai drive, the summary shows one line before you say "book it":
+```
+Carry · Thu 17:00 → Dubai: Racket, Charger · Sat 20:00 → AD: Laptop stand
+```
+After "book it", one Todoist reminder goes in **Personal Tasks** 60 min before the drive, naming the open `bring to GC` items, and one before the return naming the open `bring to apt` items: 60 min before the return drive if the plan shows one, otherwise **Saturday 20:00**. Nothing to carry, no reminder. Moving the drive later moves its reminder; skipping it cancels both (after a yes). The plan's booking nudges ("Book a haircut") also go to Personal Tasks now, not the Inbox.
+
+**Rules it keeps:** projects, sections and labels are looked up **by name** every time (no Todoist ID is in the repo). It never creates, renames or moves a project, section or label, and never relabels items already there. PRNTCODE Tasks holds your own nudges; team work stays in the Notion tracker, which this doesn't touch. Nothing goes on a calendar. No ledger changes, no migration.
+
+**Not in this release:** the **weekly-meal-plan** skill still writes to the Apple Reminders "Groceries" list. It's an uploaded claude.ai skill, not in any repo, so the switch to the Todoist Grocery List is left for a separate brief (the drop-in text is in `BUILD_REPORT_V2_2.md`).
+
+---
+
 ## v2.1: human-shaped planning (4 Oct 2026)
 
 The plan now fits a real person in real places. What changed in the planning chat:
@@ -297,7 +322,7 @@ Until the Personal and PRNTCODE agents are connected, you feed the Coordinator y
 | `Stop the Dubai drive` | Turns the recurring item off. |
 | `What repeats?` | Lists your recurring items with their interval, plus any repeating Todoist reminders. |
 
-| `Remind me after work to fix my phone screen` | Sets a **reminder in Todoist**: after your one-line "yes", a Todoist task is created in your Inbox, due Mon 18:15 in this example, and Todoist alerts your phone. No digest needed. |
+| `Remind me after work to fix my phone screen` | Sets a **reminder in Todoist**: after your one-line "yes", a Todoist task is created in Personal Tasks (or PRNTCODE Tasks; v2.2, it used to be the Inbox), due Mon 18:15 in this example, and Todoist alerts your phone. No digest needed. |
 | `Remind me every Monday at 9 to review PRNTCODE numbers` | A **repeating** Todoist reminder, using Todoist's own recurrence. |
 | `What reminders do I have?` · `Cancel the phone screen reminder` | Lists or cancels reminders in Todoist. |
 
@@ -355,7 +380,7 @@ Standing rules live in the `rules` table, in plain English. `hard` rules are nev
 | `supabase/migrations/` | The database changes, in order. **The only way the schema changes**: never edit tables in the Supabase dashboard. |
 | `supabase/seed.sql` | Two example requests and one rule, for testing. Safe to run more than once; the file shows how to delete the examples again. |
 | `.claude-plugin/marketplace.json` | Makes this repo installable as a plugin marketplace in claude.ai. |
-| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/plan/SKILL.md` (v2 half-week planning), `skills/routine/SKILL.md` (activities), `skills/coordinator/SKILL.md` (retired digest; old approvals only), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, and Todoist reminders, from chat) and `commands/` (daily-run, approve, check-access). |
+| `plugins/coordinator/` | The Coordinator plugin: its manifest, `skills/plan/SKILL.md` (v2 half-week planning), `skills/routine/SKILL.md` (activities), `skills/coordinator/SKILL.md` (retired digest; old approvals only), `skills/intake/SKILL.md` (adding, editing, repeating, listing and withdrawing requests, Todoist reminders, and Todoist lists and labels, from chat) and `commands/` (daily-run, approve, check-access). |
 | `supabase/tests/definition_of_done.sql` | A self-check. Paste it into the Supabase SQL editor and run it. It should print `ALL LEDGER CHECKS PASSED` and leaves no data behind. |
 
 ### Changing the schema later
