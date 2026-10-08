@@ -263,7 +263,7 @@ footer { color: var(--muted); font-size: 12px; }
     var notes = document.getElementById("notes"); notes.textContent = "";
     (plan.notes || []).forEach(function (n) {
       var li = el("li", n.kind || "info");
-      var lab = n.kind === "nofit" ? "Doesn't fit" : n.kind === "nudge" ? "Nudge" : n.kind === "coach" ? "Book with your coach" : n.kind === "free" ? "Free" : null;
+      var lab = n.kind === "nofit" ? "Doesn't fit" : n.kind === "nudge" ? "Nudge" : n.kind === "coach" ? "Book with your coach" : n.kind === "free" ? "Free" : n.kind === "carry" ? "Carry" : null;
       if (lab) li.appendChild(el("span", "lab", lab));
       li.appendChild(document.createTextNode(n.text)); notes.appendChild(li);
     });
